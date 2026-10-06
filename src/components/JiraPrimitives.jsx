@@ -91,24 +91,31 @@ export const TYPE_CONFIG = {
   [IssueType.EPIC]: {
     label: 'Epic',
     textClass: 'text-purple-700',
+    bgBadge: 'bg-purple-50 text-purple-700 border border-purple-200',
   },
   [IssueType.STORY]: {
     label: 'Story',
     textClass: 'text-emerald-700',
+    bgBadge: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   },
   [IssueType.TASK]: {
     label: 'Task',
     textClass: 'text-blue-700',
+    bgBadge: 'bg-blue-50 text-blue-700 border border-blue-200',
   },
   [IssueType.BUG]: {
     label: 'Bug',
     textClass: 'text-red-600',
+    bgBadge: 'bg-red-50 text-red-700 border border-red-200',
   },
   [IssueType.SUBTASK]: {
     label: 'Sub-task',
     textClass: 'text-slate-600',
+    bgBadge: 'bg-slate-100 text-slate-600 border border-slate-200',
   },
 };
+
+export const ISSUE_TYPE_CONFIG = TYPE_CONFIG;
 
 export const IssueTypeIcon = ({ type, className = 'w-4 h-4' }) => {
   switch (type) {

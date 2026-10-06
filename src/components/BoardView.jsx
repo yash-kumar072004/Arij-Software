@@ -5,16 +5,13 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Columns3,
   Eye,
   EyeOff,
   Layers,
   MessageSquare,
   Plus,
-  Rows2,
   Search,
-  SlidersHorizontal,
-  UserCheck,
+  Users,
   X,
 } from 'lucide-react';
 import {
@@ -25,81 +22,14 @@ import {
 import {
   formatShortDate,
   isOverdue,
+  ISSUE_TYPE_CONFIG,
   IssueTypeIcon,
   PRIORITY_CONFIG,
   PriorityIcon,
   STATUS_CONFIG,
   STATUS_ORDER,
-  TYPE_CONFIG,
   UserAvatar,
 } from './JiraPrimitives.jsx';
-
-const PAGE_WISE_SECTIONS = [
-  {
-    id: 'STATUS:TODO',
-    kind: 'STATUS',
-    value: IssueStatus.TODO,
-    label: 'To Do',
-    badgeClass: 'bg-slate-800 text-white border-slate-800',
-    headerAccent: 'border-t-slate-500',
-  },
-  {
-    id: 'TYPE:STORY',
-    kind: 'TYPE',
-    value: IssueType.STORY,
-    label: 'Story',
-    badgeClass: 'bg-emerald-600 text-white border-emerald-600',
-    headerAccent: 'border-t-emerald-600',
-  },
-  {
-    id: 'STATUS:IN_PROGRESS',
-    kind: 'STATUS',
-    value: IssueStatus.IN_PROGRESS,
-    label: 'In Progress',
-    badgeClass: 'bg-blue-600 text-white border-blue-600',
-    headerAccent: 'border-t-blue-600',
-  },
-  {
-    id: 'TYPE:TASK',
-    kind: 'TYPE',
-    value: IssueType.TASK,
-    label: 'Task',
-    badgeClass: 'bg-sky-600 text-white border-sky-600',
-    headerAccent: 'border-t-sky-600',
-  },
-  {
-    id: 'TYPE:BUG',
-    kind: 'TYPE',
-    value: IssueType.BUG,
-    label: 'Bug',
-    badgeClass: 'bg-red-600 text-white border-red-600',
-    headerAccent: 'border-t-red-600',
-  },
-  {
-    id: 'STATUS:IN_REVIEW',
-    kind: 'STATUS',
-    value: IssueStatus.IN_REVIEW,
-    label: 'In Review',
-    badgeClass: 'bg-indigo-600 text-white border-indigo-600',
-    headerAccent: 'border-t-indigo-600',
-  },
-  {
-    id: 'STATUS:QA',
-    kind: 'STATUS',
-    value: IssueStatus.QA,
-    label: 'QA Testing',
-    badgeClass: 'bg-amber-600 text-white border-amber-600',
-    headerAccent: 'border-t-amber-500',
-  },
-  {
-    id: 'STATUS:DONE',
-    kind: 'STATUS',
-    value: IssueStatus.DONE,
-    label: 'Done',
-    badgeClass: 'bg-teal-600 text-white border-teal-600',
-    headerAccent: 'border-t-teal-600',
-  },
-];
 
 export const BoardView = ({
   project,
@@ -115,35 +45,35 @@ export const BoardView = ({
   onOpenScreenshotImporter,
   onNavigateToBacklog,
 }) => {
-  // Layout mode: 'PAGE_WISE' (default as requested by user) or 'COLUMNS'
-  const [boardDisplayMode, setBoardDisplayMode] = useState('PAGE_WISE');
+  // User Page-Wise & Center-Line Split State:
+  // - If 1 user is selected -> shows ONLY that user's 5-column Jira board (page-wise)
+  // - If 2+ users are selected -> shows User 1's 5-column Jira board above,
+  //   a Center Line in the middle with a "Show Down / Hide Below" button,
+  //   and User 2's 5-column Jira board below the Center Line!
+  const [selectedUserIds, setSelectedUserIds] = useState(() => {
+    const firstId = users[0]?.id || currentUserId;
+    const secondId = users[1]?.id;
+    return secondId && secondId !== firstId ? [firstId, secondId] : [firstId];
+  });
 
-  // Selected sections in Page-Wise mode.
-  // If 1 is selected -> shows ONLY that 1 page-wise.
-  // If 2+ are selected -> shows both with a horizontal center divider line & button to show/hide below!
-  const [selectedSectionIds, setSelectedSectionIds] = useState([
-    'STATUS:TODO',
-    'TYPE:STORY',
-  ]);
+  // Controls whether each user section below a center line is expanded ("showing down") or collapsed ("or not")
+  const [showBelowUserMap, setShowBelowUserMap] = useState({});
 
-  // Controls whether each section below a center line is shown ("showing down") or hidden ("or not")
-  const [showBelowMap, setShowBelowMap] = useState({});
-
+  // Standard Jira Board Filters (Search, Issue Type: Story/Task/Bug, Epic, Priority)
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState(null);
   const [selectedEpicId, setSelectedEpicId] = useState(null);
-  const [onlyMyIssues, setOnlyMyIssues] = useState(false);
+  const [selectedType, setSelectedType] = useState('ALL');
   const [highPriorityOnly, setHighPriorityOnly] = useState(false);
 
-  // Drag & Drop State
+  // Drag & Drop State (tracks issueId and target user + status column)
   const [draggedIssueId, setDraggedIssueId] = useState(null);
-  const [dragOverTarget, setDragOverTarget] = useState(null);
+  const [dragOverColumnKey, setDragOverColumnKey] = useState(null);
 
-  // Quick Inline Create per Section/Column
-  const [quickCreateTarget, setQuickCreateTarget] = useState(null);
+  // Quick Inline Create per (userId + status column)
+  const [quickCreateKey, setQuickCreateKey] = useState(null);
   const [quickTitle, setQuickTitle] = useState('');
   const [quickType, setQuickType] = useState(IssueType.STORY);
-  const [quickStatus, setQuickStatus] = useState(IssueStatus.TODO);
+  const [quickPriority, setQuickPriority] = useState(IssuePriority.MEDIUM);
 
   const userMap = useMemo(() => {
     const map = {};
@@ -161,6 +91,7 @@ export const BoardView = ({
     return map;
   }, [epics]);
 
+  // Base issues for the board (Scrum active sprint or Kanban continuous flow)
   const boardBaseIssues = useMemo(() => {
     const nonEpics = issues.filter(
       (i) => i.type !== IssueType.EPIC && i.type !== IssueType.SUBTASK
@@ -168,10 +99,11 @@ export const BoardView = ({
     if (project.template === 'Kanban') {
       return nonEpics;
     }
-    if (!activeSprint) return nonEpics;
+    if (!activeSprint) return [];
     return nonEpics.filter((i) => i.sprintId === activeSprint.id);
   }, [issues, project.template, activeSprint]);
 
+  // Filtered board issues (before splitting by user)
   const filteredIssues = useMemo(() => {
     return boardBaseIssues.filter((issue) => {
       if (searchQuery.trim()) {
@@ -181,11 +113,8 @@ export const BoardView = ({
         const matchLabel = issue.labels.some((l) => l.toLowerCase().includes(q));
         if (!matchKey && !matchTitle && !matchLabel) return false;
       }
-      if (onlyMyIssues && issue.assigneeId !== currentUserId) return false;
-      if (selectedAssigneeId && issue.assigneeId !== selectedAssigneeId) {
-        return false;
-      }
       if (selectedEpicId && issue.epicId !== selectedEpicId) return false;
+      if (selectedType !== 'ALL' && issue.type !== selectedType) return false;
       if (
         highPriorityOnly &&
         issue.priority !== IssuePriority.HIGHEST &&
@@ -198,13 +127,22 @@ export const BoardView = ({
   }, [
     boardBaseIssues,
     searchQuery,
-    onlyMyIssues,
-    currentUserId,
-    selectedAssigneeId,
     selectedEpicId,
+    selectedType,
     highPriorityOnly,
   ]);
 
+  // Count by Jira Issue Type for Jira Type Filter pills
+  const typeCounts = useMemo(() => {
+    return {
+      ALL: boardBaseIssues.length,
+      [IssueType.STORY]: boardBaseIssues.filter((i) => i.type === IssueType.STORY).length,
+      [IssueType.TASK]: boardBaseIssues.filter((i) => i.type === IssueType.TASK).length,
+      [IssueType.BUG]: boardBaseIssues.filter((i) => i.type === IssueType.BUG).length,
+    };
+  }, [boardBaseIssues]);
+
+  // Sprint progress metrics
   const sprintMetrics = useMemo(() => {
     const totalPts = boardBaseIssues.reduce(
       (sum, i) => sum + (i.storyPoints || 0),
@@ -223,38 +161,31 @@ export const BoardView = ({
     };
   }, [boardBaseIssues]);
 
-  // Toggle a section in Page-Wise selector:
-  // Clicking toggles it in/out of the active array (keeping at least 1 selected).
-  const handleToggleSection = (sectionId) => {
-    setSelectedSectionIds((prev) => {
-      if (prev.includes(sectionId)) {
-        if (prev.length === 1) return prev; // Keep at least 1 active
-        return prev.filter((id) => id !== sectionId);
+  // Click user avatar/chip to toggle in/out of selection:
+  // - 1 user selected -> Page-wise view for ONLY that user
+  // - 2+ users selected -> Multi-user view with Center Line & Show Down button between users
+  const handleToggleUser = (userId) => {
+    setSelectedUserIds((prev) => {
+      if (prev.includes(userId)) {
+        if (prev.length === 1) return prev; // Keep at least 1 user active
+        return prev.filter((id) => id !== userId);
       }
-      // Ensure newly added section below the center line defaults to visible ("showing down = true")
-      setShowBelowMap((m) => ({ ...m, [sectionId]: true }));
-      return [...prev, sectionId];
+      setShowBelowUserMap((m) => ({ ...m, [userId]: true }));
+      return [...prev, userId];
     });
   };
 
-  // Focus ONLY a single section full-page
-  const handleSelectOnlySection = (sectionId) => {
-    setSelectedSectionIds([sectionId]);
+  // Show ONLY this single user's board full-page
+  const handleSelectOnlyUser = (userId) => {
+    setSelectedUserIds([userId]);
   };
 
-  // Toggle whether the section below the center line is shown or hidden
-  const handleToggleShowBelow = (sectionId) => {
-    setShowBelowMap((prev) => {
-      const current = prev[sectionId] !== false;
-      return { ...prev, [sectionId]: !current };
+  // Toggle whether the user board below the Center Line is shown ("showing down") or hidden ("or not")
+  const handleToggleShowBelowUser = (userId) => {
+    setShowBelowUserMap((prev) => {
+      const current = prev[userId] !== false;
+      return { ...prev, [userId]: !current };
     });
-  };
-
-  const getIssuesForSection = (section) => {
-    if (section.kind === 'STATUS') {
-      return filteredIssues.filter((i) => i.status === section.value);
-    }
-    return filteredIssues.filter((i) => i.type === section.value);
   };
 
   const handleDragStart = (e, issueId) => {
@@ -263,41 +194,62 @@ export const BoardView = ({
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDropOnStatus = (e, status) => {
+  const handleDragOver = (e, colKey) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverColumnKey !== colKey) {
+      setDragOverColumnKey(colKey);
+    }
+  };
+
+  const handleDrop = (e, status, targetUserId) => {
     e.preventDefault();
     const issueId = e.dataTransfer.getData('text/plain') || draggedIssueId;
     if (issueId) {
-      onUpdateIssueStatus(issueId, status);
+      const resolvedAssignee = targetUserId === 'UNASSIGNED' ? null : targetUserId;
+      onUpdateIssueStatus(issueId, status, resolvedAssignee);
     }
     setDraggedIssueId(null);
-    setDragOverTarget(null);
+    setDragOverColumnKey(null);
   };
 
-  const handleQuickCreateSubmit = (e, section) => {
+  const handleQuickCreateSubmit = (e, status, assigneeId) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
-    const resolvedType =
-      section && section.kind === 'TYPE' ? section.value : quickType;
-    const resolvedStatus =
-      section && section.kind === 'STATUS' ? section.value : quickStatus;
-
     onQuickCreateIssue({
       title: quickTitle.trim(),
-      type: resolvedType,
-      status: resolvedStatus,
+      type: quickType,
+      priority: quickPriority,
+      status,
       sprintId: activeSprint ? activeSprint.id : null,
       epicId: selectedEpicId,
+      assigneeId: assigneeId === 'UNASSIGNED' ? null : assigneeId,
     });
     setQuickTitle('');
-    setQuickCreateTarget(null);
+    setQuickCreateKey(null);
   };
 
-  const renderIssueCard = (issue, showStatusSelector = false) => {
+  const hasActiveFilters =
+    Boolean(searchQuery.trim()) ||
+    Boolean(selectedEpicId) ||
+    selectedType !== 'ALL' ||
+    highPriorityOnly;
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setSelectedEpicId(null);
+    setSelectedType('ALL');
+    setHighPriorityOnly(false);
+  };
+
+  // Render an authentic Jira Issue Card inside the 5-column Kanban board
+  const renderIssueCard = (issue) => {
     const assignee = issue.assigneeId ? userMap[issue.assigneeId] : null;
     const parentEpic = issue.epicId ? epicMap[issue.epicId] : null;
-    const completedSubtasks = issue.subtasks.filter((s) => s.completed).length;
-    const totalSubtasks = issue.subtasks.length;
+    const completedSubtasks = (issue.subtasks || []).filter((s) => s.completed).length;
+    const totalSubtasks = (issue.subtasks || []).length;
     const overdue = isOverdue(issue.dueDate, issue.status);
+    const typeInfo = ISSUE_TYPE_CONFIG[issue.type] || ISSUE_TYPE_CONFIG[IssueType.TASK];
 
     return (
       <div
@@ -306,91 +258,78 @@ export const BoardView = ({
         onDragStart={(e) => handleDragStart(e, issue.id)}
         onDragEnd={() => {
           setDraggedIssueId(null);
-          setDragOverTarget(null);
+          setDragOverColumnKey(null);
         }}
         onClick={() => onSelectIssue(issue.id)}
-        className={`group bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs hover:border-blue-500 hover:shadow-md transition-all cursor-pointer select-none flex flex-col justify-between gap-2.5 ${
+        className={`group bg-white border border-slate-200 rounded-md p-3.5 shadow-2xs hover:border-blue-500 hover:shadow-md transition-all cursor-pointer select-none flex flex-col gap-2.5 ${
           draggedIssueId === issue.id ? 'opacity-40 scale-[0.98]' : ''
         }`}
       >
-        <div className="space-y-2">
-          {/* Top Row: Issue Type + Key + Status Badge/Selector */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <IssueTypeIcon type={issue.type} className="w-3.5 h-3.5" />
-              <span className="font-mono tabular-nums text-xs font-semibold text-blue-700 group-hover:underline">
-                {issue.key}
-              </span>
-              <span className="text-[11px] text-slate-400">
-                · {TYPE_CONFIG[issue.type]?.label}
-              </span>
-            </div>
-
-            {showStatusSelector ? (
-              <div onClick={(e) => e.stopPropagation()}>
-                <select
-                  value={issue.status}
-                  onChange={(e) => onUpdateIssueStatus(issue.id, e.target.value)}
-                  className={`text-[11px] font-semibold bg-slate-50 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:border-blue-600 ${
-                    STATUS_CONFIG[issue.status]?.textClass || 'text-slate-700'
-                  }`}
-                >
-                  {STATUS_ORDER.map((st) => (
-                    <option key={st} value={st}>
-                      {STATUS_CONFIG[st].label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              issue.dueDate && (
-                <span
-                  className={`font-mono tabular-nums text-[11px] flex items-center gap-1 ${
-                    overdue ? 'text-red-600 font-semibold' : 'text-slate-400'
-                  }`}
-                >
-                  <Calendar className="w-3 h-3" />
-                  {formatShortDate(issue.dueDate)}
-                </span>
-              )
-            )}
+        {/* Row 1: Jira Issue Type Badge + Monospace Issue Key + Due Date */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${typeInfo.bgBadge}`}
+            >
+              <IssueTypeIcon type={issue.type} className="w-3 h-3" />
+              {typeInfo.label}
+            </span>
+            <span className="font-mono tabular-nums text-xs font-semibold text-slate-500 group-hover:text-blue-600 transition-colors">
+              {issue.key}
+            </span>
           </div>
-
-          {/* Issue Summary Title */}
-          <h4 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2">
-            {issue.title}
-          </h4>
-
-          {/* Epic / Subtask Context */}
-          {(parentEpic || totalSubtasks > 0) && (
-            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
-              {parentEpic ? (
-                <span className="font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded truncate max-w-[200px]">
-                  {parentEpic.title}
-                </span>
-              ) : (
-                <span />
-              )}
-              {totalSubtasks > 0 && (
-                <span className="font-mono tabular-nums text-slate-500 shrink-0">
-                  {completedSubtasks}/{totalSubtasks} subtasks
-                </span>
-              )}
-            </div>
+          {issue.dueDate && (
+            <span
+              className={`font-mono tabular-nums text-[11px] flex items-center gap-1 ${
+                overdue ? 'text-red-600 font-semibold' : 'text-slate-400'
+              }`}
+            >
+              <Calendar className="w-3 h-3" />
+              {formatShortDate(issue.dueDate)}
+            </span>
           )}
         </div>
 
-        {/* Footer: Priority + Story Points + Assignee */}
-        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-          <div className="flex items-center gap-2.5">
+        {/* Row 2: Issue Summary Title */}
+        <h4 className="text-[13px] font-medium text-slate-900 leading-snug line-clamp-2">
+          {issue.title}
+        </h4>
+
+        {/* Row 3: Jira Epic Lozenge, Labels & Subtask Progress */}
+        {(parentEpic || totalSubtasks > 0 || (issue.labels && issue.labels.length > 0)) && (
+          <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] pt-0.5">
+            <div className="flex flex-wrap items-center gap-1 min-w-0">
+              {parentEpic && (
+                <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-semibold truncate max-w-[165px]">
+                  {parentEpic.title}
+                </span>
+              )}
+              {issue.labels &&
+                issue.labels.slice(0, 2).map((lbl) => (
+                  <span
+                    key={lbl}
+                    className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[10px]"
+                  >
+                    {lbl}
+                  </span>
+                ))}
+            </div>
+            {totalSubtasks > 0 && (
+              <span className="font-mono tabular-nums text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded text-[10px] shrink-0">
+                {completedSubtasks}/{totalSubtasks} subtasks
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Row 4: Jira Card Footer (Priority Icon + Story Points + Comments + Quick Status + Assignee Avatar) */}
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2">
             <span
-              className="inline-flex items-center gap-1 text-xs"
-              title={`Priority: ${PRIORITY_CONFIG[issue.priority]?.label}`}
+              className="inline-flex items-center gap-1"
+              title={`Priority: ${PRIORITY_CONFIG[issue.priority]?.label || issue.priority}`}
             >
               <PriorityIcon priority={issue.priority} className="w-3.5 h-3.5" />
-              <span className={`text-[11px] font-medium ${PRIORITY_CONFIG[issue.priority]?.textClass}`}>
-                {PRIORITY_CONFIG[issue.priority]?.label}
-              </span>
             </span>
 
             {issue.storyPoints > 0 && (
@@ -398,7 +337,7 @@ export const BoardView = ({
                 className="font-mono tabular-nums text-[11px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded"
                 title="Story Points"
               >
-                {issue.storyPoints} pts
+                {issue.storyPoints}p
               </span>
             )}
 
@@ -410,540 +349,132 @@ export const BoardView = ({
             )}
           </div>
 
-          <UserAvatar user={assignee} size="xs" showName />
+          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <select
+              value={issue.status}
+              onChange={(e) =>
+                onUpdateIssueStatus(issue.id, e.target.value, issue.assigneeId)
+              }
+              aria-label={`Change status for ${issue.key}`}
+              className="text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded px-1.5 py-0.5 border border-slate-200 focus:outline-none cursor-pointer"
+            >
+              {STATUS_ORDER.map((st) => (
+                <option key={st} value={st}>
+                  {STATUS_CONFIG[st].shortLabel}
+                </option>
+              ))}
+            </select>
+            <UserAvatar user={assignee} size="xs" />
+          </div>
         </div>
       </div>
     );
   };
 
-  const activeSections = useMemo(() => {
-    return selectedSectionIds
-      .map((id) => PAGE_WISE_SECTIONS.find((s) => s.id === id))
-      .filter(Boolean);
-  }, [selectedSectionIds]);
+  // Include Unassigned pseudo-user if selected
+  const unassignedUserObj = useMemo(
+    () => ({
+      id: 'UNASSIGNED',
+      name: 'Unassigned Issues',
+      initials: 'UA',
+      role: 'Backlog / Unassigned Queue',
+      department: 'Shared Team Queue',
+    }),
+    []
+  );
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
-      {/* Board Header & Sprint Telemetry */}
-      <div className="px-6 py-4 bg-white border-b border-slate-200 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <span>{project.name}</span>
-              <span>/</span>
-              <span className="font-mono font-semibold text-slate-700">
-                {project.key}
-              </span>
-              {project.isPersonal && (
-                <>
-                  <span>·</span>
-                  <span className="text-blue-700 font-semibold">
-                    My Personal Workspace
-                  </span>
-                </>
-              )}
-              {activeSprint && project.template === 'Scrum' && (
-                <>
-                  <span>/</span>
-                  <span className="text-blue-700 font-medium">
-                    {activeSprint.name}
-                  </span>
-                </>
-              )}
+  // Resolve the list of selected User objects
+  const activeSelectedUsers = useMemo(() => {
+    const resolved = selectedUserIds
+      .map((id) => {
+        if (id === 'UNASSIGNED') return unassignedUserObj;
+        return users.find((u) => u.id === id);
+      })
+      .filter(Boolean);
+    return resolved.length > 0 ? resolved : users.slice(0, 1);
+  }, [selectedUserIds, users, unassignedUserObj]);
+
+  // Render the classic Jira 5-Column Kanban Board (TO DO, IN PROGRESS, IN REVIEW, QA TESTING, DONE) for a specific User
+  const renderUserFiveColumnBoard = (userObj) => {
+    const userIssues = filteredIssues.filter((i) =>
+      userObj.id === 'UNASSIGNED'
+        ? !i.assigneeId
+        : i.assigneeId === userObj.id
+    );
+    const userTotalPts = userIssues.reduce(
+      (s, i) => s + (i.storyPoints || 0),
+      0
+    );
+    const userDonePts = userIssues
+      .filter((i) => i.status === IssueStatus.DONE)
+      .reduce((s, i) => s + (i.storyPoints || 0), 0);
+
+    const storyCount = userIssues.filter((i) => i.type === IssueType.STORY).length;
+    const taskCount = userIssues.filter((i) => i.type === IssueType.TASK).length;
+    const bugCount = userIssues.filter((i) => i.type === IssueType.BUG).length;
+
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+        {/* User Swimlane / Board Header */}
+        <div className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <UserAvatar
+              user={userObj.id === 'UNASSIGNED' ? null : userObj}
+              size="md"
+            />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-bold text-white">
+                  {userObj.name}&rsquo;s Jira Board
+                </h2>
+                <span className="text-[11px] px-2 py-0.5 rounded bg-blue-600/30 border border-blue-400/30 text-blue-200 font-semibold">
+                  {userObj.role}
+                </span>
+                <span className="text-[11px] font-mono text-slate-300 bg-slate-800 px-2 py-0.5 rounded">
+                  {storyCount} Stories · {taskCount} Tasks · {bugCount} Bugs
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                {userObj.department} · {userIssues.length} issues · {userDonePts}/
+                {userTotalPts} story points completed
+              </p>
             </div>
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight mt-0.5">
-              {project.template === 'Kanban'
-                ? `${project.key} Continuous Flow Board`
-                : activeSprint
-                ? activeSprint.name
-                : `${project.name} Board`}
-            </h1>
           </div>
 
-          {/* Right Sprint Actions & Layout Mode Switcher */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200 text-xs">
+          <div className="flex items-center gap-2">
+            {activeSelectedUsers.length > 1 && (
               <button
                 type="button"
-                onClick={() => setBoardDisplayMode('PAGE_WISE')}
-                className={`px-3 py-1.5 rounded font-semibold flex items-center gap-1.5 transition-colors ${
-                  boardDisplayMode === 'PAGE_WISE'
-                    ? 'bg-white text-blue-700 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
+                onClick={() => handleSelectOnlyUser(userObj.id)}
+                className="px-3 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-md transition-colors"
               >
-                <Rows2 className="w-3.5 h-3.5" />
-                Page-Wise & Center Split
-              </button>
-              <button
-                type="button"
-                onClick={() => setBoardDisplayMode('COLUMNS')}
-                className={`px-3 py-1.5 rounded font-semibold flex items-center gap-1.5 transition-colors ${
-                  boardDisplayMode === 'COLUMNS'
-                    ? 'bg-white text-blue-700 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Columns3 className="w-3.5 h-3.5" />
-                All Columns
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={onOpenScreenshotImporter}
-              className="px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
-            >
-              Import Board Screenshot
-            </button>
-
-            {project.template === 'Scrum' && activeSprint && (
-              <button
-                type="button"
-                onClick={onOpenCompleteSprintModal}
-                className="px-3.5 py-2 text-xs font-semibold text-slate-800 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                Complete Sprint
+                Show Only {userObj.name.split(' ')[0]}
               </button>
             )}
           </div>
         </div>
 
-        {/* PAGE-WISE SELECTOR BAR (Click 1 to show only that page-wise; Click 2+ to split with Center Line & Show-Down button) */}
-        {boardDisplayMode === 'PAGE_WISE' && (
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col gap-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-800">
-                  Page-Wise View Selector:
-                </span>
-                <span className="text-xs text-slate-500">
-                  Click <strong>1 item</strong> (e.g. only <em>To Do</em> or only{' '}
-                  <em>Story</em>) for single full-page view, or click{' '}
-                  <strong>2+ items</strong> to stack them with a{' '}
-                  <strong>Center Line & Show/Hide Below button</strong>.
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedSectionIds(['STATUS:TODO'])}
-                  className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700"
-                >
-                  Only To Do
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedSectionIds(['TYPE:STORY'])}
-                  className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700"
-                >
-                  Only Story
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedSectionIds(['STATUS:TODO', 'TYPE:STORY']);
-                    setShowBelowMap({ 'TYPE:STORY': true });
-                  }}
-                  className="px-2.5 py-1 text-[11px] font-semibold bg-blue-50 border border-blue-300 rounded hover:bg-blue-100 text-blue-700"
-                >
-                  To Do + Story (Split)
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {PAGE_WISE_SECTIONS.map((sec) => {
-                const isSelected = selectedSectionIds.includes(sec.id);
-                const count = getIssuesForSection(sec).length;
-                const selectionOrder = selectedSectionIds.indexOf(sec.id) + 1;
-
-                return (
-                  <div
-                    key={sec.id}
-                    className={`inline-flex items-center rounded-md border text-xs transition-all overflow-hidden ${
-                      isSelected
-                        ? `${sec.badgeClass} shadow-xs`
-                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleToggleSection(sec.id)}
-                      className="px-3 py-1.5 font-semibold flex items-center gap-1.5"
-                    >
-                      {isSelected && (
-                        <span className="w-4 h-4 rounded-full bg-white/25 text-white font-mono text-[10px] flex items-center justify-center">
-                          {selectionOrder}
-                        </span>
-                      )}
-                      <span>{sec.label}</span>
-                      <span
-                        className={`font-mono text-[11px] px-1.5 py-0.2 rounded ${
-                          isSelected
-                            ? 'bg-black/20 text-white'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </button>
-
-                    {/* Quick button to show ONLY this section page-wise */}
-                    {!(selectedSectionIds.length === 1 && isSelected) && (
-                      <button
-                        type="button"
-                        onClick={() => handleSelectOnlySection(sec.id)}
-                        title={`Show ONLY ${sec.label} full page`}
-                        className={`px-2 py-1.5 text-[10px] font-bold border-l transition-colors ${
-                          isSelected
-                            ? 'border-white/20 hover:bg-black/20 text-white/90'
-                            : 'border-slate-200 hover:bg-slate-200 text-slate-500'
-                        }`}
-                      >
-                        Only
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Search & Quick Filters Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filter by key, summary, label..."
-                className="pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white w-56"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1 px-1">
-              {users.map((u) => {
-                const isSelected = selectedAssigneeId === u.id;
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedAssigneeId(isSelected ? null : u.id)
-                    }
-                    className={`rounded transition-transform ${
-                      isSelected
-                        ? 'ring-2 ring-blue-600 ring-offset-1 scale-105'
-                        : 'opacity-80 hover:opacity-100'
-                    }`}
-                    title={`Filter by ${u.name}`}
-                  >
-                    <UserAvatar user={u} size="sm" />
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setOnlyMyIssues(!onlyMyIssues)}
-              className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 ${
-                onlyMyIssues
-                  ? 'bg-blue-50 border-blue-600 text-blue-700'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              Only My Issues
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setHighPriorityOnly(!highPriorityOnly)}
-              className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                highPriorityOnly
-                  ? 'bg-orange-50 border-orange-500 text-orange-700'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              High / Highest
-            </button>
-
-            <select
-              value={selectedEpicId || ''}
-              onChange={(e) => setSelectedEpicId(e.target.value || null)}
-              aria-label="Filter by Epic"
-              className="px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:border-blue-600"
-            >
-              <option value="">All Epics</option>
-              {epics.map((ep) => (
-                <option key={ep.id} value={ep.id}>
-                  {ep.key}: {ep.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="text-xs font-mono text-slate-500">
-            {sprintMetrics.donePts}/{sprintMetrics.totalPts} pts Done ({sprintMetrics.pct}%)
-          </div>
-        </div>
-      </div>
-
-      {/* MAIN BOARD BODY */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {boardDisplayMode === 'PAGE_WISE' ? (
-          /* ==================================================================
-             PAGE-WISE & CENTER-LINE SPLIT VIEW
-             - 1 selected -> Full-page single view
-             - 2+ selected -> Top section + Center Divider Line with "Show Down / Hide" button + Bottom section
-             ================================================================== */
-          <div className="max-w-7xl mx-auto space-y-2">
-            {activeSections.map((section, idx) => {
-              const sectionIssues = getIssuesForSection(section);
-              const sectionPoints = sectionIssues.reduce(
-                (s, i) => s + (i.storyPoints || 0),
-                0
-              );
-              // First section is always visible; subsequent sections are below a Center Line and controlled by showBelowMap
-              const isBelowCenterLine = idx > 0;
-              const isShowingDown = showBelowMap[section.id] !== false;
-
-              return (
-                <React.Fragment key={section.id}>
-                  {/* HORIZONTAL CENTER LINE DIVIDER WITH SHOW/HIDE DOWN BUTTON */}
-                  {isBelowCenterLine && (
-                    <div className="relative py-6 flex items-center justify-center select-none">
-                      {/* Full-width horizontal center line */}
-                      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-slate-300" />
-
-                      {/* Interactive Button on the Center Line to show/hide the section below */}
-                      <div className="relative z-10 flex items-center gap-2 bg-white px-4 py-1.5 rounded-full border-2 border-slate-400 shadow-sm">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                          Center Line
-                        </span>
-                        <span className="text-slate-300">|</span>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleShowBelow(section.id)}
-                          className={`px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                            isShowingDown
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'bg-slate-800 text-white hover:bg-slate-900'
-                          }`}
-                        >
-                          {isShowingDown ? (
-                            <>
-                              <EyeOff className="w-3.5 h-3.5" />
-                              Hide Below ({section.label})
-                              <ChevronUp className="w-3.5 h-3.5" />
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="w-3.5 h-3.5" />
-                              Show Down ({section.label} · {sectionIssues.length})
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SECTION PAGE-WISE CONTAINER */}
-                  {(!isBelowCenterLine || isShowingDown) && (
-                    <section
-                      onDragOver={(e) => {
-                        if (section.kind === 'STATUS') {
-                          e.preventDefault();
-                          setDragOverTarget(section.id);
-                        }
-                      }}
-                      onDragLeave={() => setDragOverTarget(null)}
-                      onDrop={(e) => {
-                        if (section.kind === 'STATUS') {
-                          handleDropOnStatus(e, section.value);
-                        }
-                      }}
-                      className={`bg-white rounded-xl border border-slate-200 border-t-4 ${
-                        section.headerAccent
-                      } shadow-xs overflow-hidden transition-all ${
-                        dragOverTarget === section.id
-                          ? 'ring-2 ring-blue-500 bg-blue-50/30'
-                          : ''
-                      }`}
-                    >
-                      {/* Section Page Header */}
-                      <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${section.badgeClass}`}
-                          >
-                            {section.label}
-                          </span>
-                          <div>
-                            <h2 className="text-sm font-bold text-slate-900">
-                              {section.kind === 'STATUS'
-                                ? `${section.label} Status Page`
-                                : `${section.label} Issues Page`}
-                            </h2>
-                            <p className="text-xs text-slate-500">
-                              Showing {sectionIssues.length} items · {sectionPoints}{' '}
-                              story points
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {activeSections.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleSelectOnlySection(section.id)}
-                              className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-100"
-                            >
-                              Show Only {section.label} Full Page
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setQuickCreateTarget(
-                                quickCreateTarget === section.id
-                                  ? null
-                                  : section.id
-                              );
-                              setQuickTitle('');
-                            }}
-                            className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            Add to {section.label}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Quick Create Inline Drawer */}
-                      {quickCreateTarget === section.id && (
-                        <form
-                          onSubmit={(e) => handleQuickCreateSubmit(e, section)}
-                          className="p-4 bg-blue-50/60 border-b border-blue-200 flex flex-wrap items-center gap-3"
-                        >
-                          {section.kind !== 'TYPE' && (
-                            <select
-                              value={quickType}
-                              onChange={(e) => setQuickType(e.target.value)}
-                              className="px-2.5 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-md"
-                            >
-                              <option value={IssueType.STORY}>Story</option>
-                              <option value={IssueType.TASK}>Task</option>
-                              <option value={IssueType.BUG}>Bug</option>
-                            </select>
-                          )}
-                          {section.kind !== 'STATUS' && (
-                            <select
-                              value={quickStatus}
-                              onChange={(e) => setQuickStatus(e.target.value)}
-                              className="px-2.5 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-md"
-                            >
-                              {STATUS_ORDER.map((st) => (
-                                <option key={st} value={st}>
-                                  {STATUS_CONFIG[st].label}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                          <input
-                            type="text"
-                            autoFocus
-                            value={quickTitle}
-                            onChange={(e) => setQuickTitle(e.target.value)}
-                            placeholder={`Enter new ${section.label} summary...`}
-                            className="flex-1 min-w-[240px] px-3 py-1.5 text-xs bg-white border border-blue-500 rounded-md focus:outline-none"
-                          />
-                          <button
-                            type="submit"
-                            className="px-4 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                          >
-                            Create
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setQuickCreateTarget(null)}
-                            className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900"
-                          >
-                            Cancel
-                          </button>
-                        </form>
-                      )}
-
-                      {/* Section Cards Grid */}
-                      <div className="p-6">
-                        {sectionIssues.length === 0 ? (
-                          <div className="py-12 border-2 border-dashed border-slate-200 rounded-lg text-center">
-                            <p className="text-sm font-semibold text-slate-600">
-                              No issues in {section.label}
-                            </p>
-                            <p className="text-xs text-slate-400 mt-1">
-                              Click &ldquo;Add to {section.label}&rdquo; above to create an item here.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {sectionIssues.map((issue) =>
-                              renderIssueCard(issue, true)
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </section>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        ) : (
-          /* ==================================================================
-             CLASSIC 5-COLUMN KANBAN VIEW
-             ================================================================== */
-          <div className="grid grid-cols-5 gap-4 min-w-[1120px] h-full">
+        {/* Classic 5-Column Jira Kanban Grid (TO DO | IN PROGRESS | IN REVIEW | QA TESTING | DONE) */}
+        <div className="p-4 overflow-x-auto bg-slate-50">
+          <div className="grid grid-cols-5 gap-4 min-w-[1080px]">
             {STATUS_ORDER.map((status) => {
               const colConfig = STATUS_CONFIG[status];
-              const colIssues = filteredIssues.filter(
-                (i) => i.status === status
-              );
+              const colIssues = userIssues.filter((i) => i.status === status);
               const colPoints = colIssues.reduce(
                 (s, i) => s + (i.storyPoints || 0),
                 0
               );
               const wipLimit = project.wipLimits[status] || 0;
               const wipExceeded = wipLimit > 0 && colIssues.length > wipLimit;
-              const isDragTarget = dragOverTarget === status;
+              const colKey = `${userObj.id}:${status}`;
+              const isDragTarget = dragOverColumnKey === colKey;
 
               return (
                 <div
-                  key={status}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOverTarget(status);
-                  }}
-                  onDragLeave={() => setDragOverTarget(null)}
-                  onDrop={(e) => handleDropOnStatus(e, status)}
+                  key={colKey}
+                  onDragOver={(e) => handleDragOver(e, colKey)}
+                  onDragLeave={() => setDragOverColumnKey(null)}
+                  onDrop={(e) => handleDrop(e, status, userObj.id)}
                   className={`flex flex-col rounded-lg border border-t-4 ${
                     colConfig.accentBorder
                   } ${
@@ -952,8 +483,9 @@ export const BoardView = ({
                       : isDragTarget
                       ? 'bg-blue-50/60 border-blue-400'
                       : 'bg-slate-100/80 border-slate-200'
-                  } transition-colors min-h-[460px]`}
+                  } transition-colors min-h-[340px]`}
                 >
+                  {/* Column Header */}
                   <div className="p-3 border-b border-slate-200/80 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-bold tracking-wider uppercase text-slate-700 truncate">
@@ -981,21 +513,525 @@ export const BoardView = ({
                     </div>
                   </div>
 
+                  {/* Cards List */}
                   <div className="flex-1 p-2.5 flex flex-col gap-2.5 overflow-y-auto">
-                    {colIssues.map((issue) => renderIssueCard(issue, false))}
+                    {colIssues.map((issue) => renderIssueCard(issue))}
 
                     {colIssues.length === 0 && !isDragTarget && (
-                      <div className="flex-1 min-h-[120px] border border-dashed border-slate-300 rounded-md flex items-center justify-center text-xs text-slate-400">
-                        Drop issues here
+                      <div className="flex-1 min-h-[100px] border border-dashed border-slate-300 rounded-md flex items-center justify-center text-xs text-slate-400 text-center px-2">
+                        Drop {userObj.initials}&rsquo;s {colConfig.label} issues here
                       </div>
+                    )}
+                  </div>
+
+                  {/* Quick Inline Create Footer (Automatically assigns to this user + status!) */}
+                  <div className="p-2.5 border-t border-slate-200/60">
+                    {quickCreateKey === colKey ? (
+                      <form
+                        onSubmit={(e) =>
+                          handleQuickCreateSubmit(e, status, userObj.id)
+                        }
+                        className="bg-white p-2.5 rounded-md border border-blue-500 shadow-xs space-y-2"
+                      >
+                        <input
+                          type="text"
+                          autoFocus
+                          value={quickTitle}
+                          onChange={(e) => setQuickTitle(e.target.value)}
+                          placeholder={`What needs to be done in ${colConfig.shortLabel}?`}
+                          className="w-full text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                        />
+                        <div className="flex items-center justify-between gap-1 pt-1">
+                          <div className="flex items-center gap-1">
+                            <select
+                              value={quickType}
+                              onChange={(e) => setQuickType(e.target.value)}
+                              aria-label="Issue Type"
+                              className="text-[11px] font-medium bg-slate-100 border border-slate-200 rounded px-1.5 py-1 text-slate-700"
+                            >
+                              <option value={IssueType.STORY}>Story</option>
+                              <option value={IssueType.TASK}>Task</option>
+                              <option value={IssueType.BUG}>Bug</option>
+                            </select>
+                            <select
+                              value={quickPriority}
+                              onChange={(e) => setQuickPriority(e.target.value)}
+                              aria-label="Issue Priority"
+                              className="text-[11px] font-medium bg-slate-100 border border-slate-200 rounded px-1.5 py-1 text-slate-700"
+                            >
+                              <option value={IssuePriority.HIGHEST}>Highest</option>
+                              <option value={IssuePriority.HIGH}>High</option>
+                              <option value={IssuePriority.MEDIUM}>Medium</option>
+                              <option value={IssuePriority.LOW}>Low</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setQuickCreateKey(null)}
+                              className="px-2 py-1 text-[11px] text-slate-500 hover:text-slate-800"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-blue-600 text-white rounded hover:bg-blue-700"
+                            >
+                              Create
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickCreateKey(colKey);
+                          setQuickTitle('');
+                        }}
+                        className="w-full py-1.5 px-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded flex items-center gap-1.5 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Create issue
+                      </button>
                     )}
                   </div>
                 </div>
               );
             })}
           </div>
-        )}
+        </div>
       </div>
+    );
+  };
+
+  const unassignedCount = filteredIssues.filter((i) => !i.assigneeId).length;
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+      {/* Board Header & Sprint Telemetry */}
+      <div className="px-6 py-4 bg-white border-b border-slate-200 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>{project.name}</span>
+              <span>/</span>
+              <span className="font-mono font-semibold text-slate-700">
+                {project.key}
+              </span>
+              {activeSprint && project.template === 'Scrum' && (
+                <>
+                  <span>/</span>
+                  <span className="text-blue-700 font-medium">
+                    {activeSprint.name}
+                  </span>
+                </>
+              )}
+            </div>
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight mt-0.5">
+              {project.template === 'Kanban'
+                ? `${project.key} Continuous Flow Board`
+                : activeSprint
+                ? activeSprint.name
+                : 'No Active Sprint'}
+            </h1>
+            {activeSprint?.goal && project.template === 'Scrum' && (
+              <p className="text-xs text-slate-600 mt-0.5 max-w-3xl">
+                <strong className="font-semibold text-slate-700">Sprint Goal:</strong>{' '}
+                {activeSprint.goal}
+              </p>
+            )}
+          </div>
+
+          {/* Right Sprint Actions & Progress */}
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-3 pr-4 border-r border-slate-200">
+              <div className="text-right">
+                <div className="text-xs font-semibold text-slate-800 font-mono tabular-nums">
+                  {sprintMetrics.donePts} / {sprintMetrics.totalPts} pts Done (
+                  {sprintMetrics.pct}%)
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  {sprintMetrics.doneCount} of {sprintMetrics.totalCount} issues completed
+                </div>
+              </div>
+              <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-600 transition-all duration-300"
+                  style={{ width: `${sprintMetrics.pct}%` }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onOpenScreenshotImporter}
+              className="px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+            >
+              Import Board Screenshot
+            </button>
+
+            {project.template === 'Scrum' && activeSprint && (
+              <button
+                type="button"
+                onClick={onOpenCompleteSprintModal}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-800 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Complete Sprint
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ====================================================================
+            JIRA ASSIGNEE / USER SELECTOR BAR (PAGE-WISE & CENTER-LINE SPLIT)
+            - Click 1 User ("Only") -> shows ONLY that user's 5-column Jira board
+            - Click 2+ Users -> shows both users' 5-column Jira boards separated by a
+              Center Line in the middle with a Show Down / Hide Below button!
+           ==================================================================== */}
+        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col gap-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-bold text-slate-900">
+                Jira User Swimlanes (Page-Wise & Center-Line Split):
+              </span>
+              <span className="text-xs text-slate-500">
+                Click <strong>1 user</strong> to view only their 5-column board, or click{' '}
+                <strong>2+ users</strong> to split with a{' '}
+                <strong>Center Line &amp; Show Down button</strong>.
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSelectOnlyUser(currentUserId)}
+                className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700"
+              >
+                Only My Board
+              </button>
+              {users.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const u1 = users[0].id;
+                    const u2 = users[1].id;
+                    setSelectedUserIds([u1, u2]);
+                    setShowBelowUserMap({ [u2]: true });
+                  }}
+                  className="px-2.5 py-1 text-[11px] font-semibold bg-blue-50 border border-blue-300 rounded hover:bg-blue-100 text-blue-700"
+                >
+                  2 Users (Center Line Split)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const allIds = users.map((u) => u.id);
+                  setSelectedUserIds(allIds);
+                  const allVisible = {};
+                  allIds.forEach((id) => {
+                    allVisible[id] = true;
+                  });
+                  setShowBelowUserMap(allVisible);
+                }}
+                className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700"
+              >
+                All Users
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {users.map((u) => {
+              const isSelected = selectedUserIds.includes(u.id);
+              const orderNum = selectedUserIds.indexOf(u.id) + 1;
+              const userTaskCount = filteredIssues.filter(
+                (i) => i.assigneeId === u.id
+              ).length;
+
+              return (
+                <div
+                  key={u.id}
+                  className={`inline-flex items-center rounded-md border text-xs transition-all overflow-hidden ${
+                    isSelected
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleToggleUser(u.id)}
+                    className="px-3 py-1.5 font-semibold flex items-center gap-2"
+                  >
+                    {isSelected ? (
+                      <span className="w-4 h-4 rounded-full bg-white/25 text-white font-mono text-[10px] flex items-center justify-center">
+                        {orderNum}
+                      </span>
+                    ) : (
+                      <span className="w-4 h-4 rounded bg-slate-200 text-slate-700 font-mono text-[10px] flex items-center justify-center">
+                        {u.initials}
+                      </span>
+                    )}
+                    <span>{u.name}</span>
+                    <span
+                      className={`font-mono text-[11px] px-1.5 rounded ${
+                        isSelected
+                          ? 'bg-black/20 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {userTaskCount}
+                    </span>
+                  </button>
+
+                  {!(selectedUserIds.length === 1 && isSelected) && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectOnlyUser(u.id)}
+                      title={`Show ONLY ${u.name}'s board`}
+                      className={`px-2 py-1.5 text-[10px] font-bold border-l transition-colors ${
+                        isSelected
+                          ? 'border-white/20 hover:bg-black/20 text-white'
+                          : 'border-slate-200 hover:bg-slate-200 text-slate-500'
+                      }`}
+                    >
+                      Only
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Unassigned Queue Chip */}
+            {unassignedCount > 0 && (
+              <div
+                className={`inline-flex items-center rounded-md border text-xs transition-all overflow-hidden ${
+                  selectedUserIds.includes('UNASSIGNED')
+                    ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
+                    : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleToggleUser('UNASSIGNED')}
+                  className="px-3 py-1.5 font-semibold flex items-center gap-2"
+                >
+                  <span>Unassigned</span>
+                  <span className="font-mono text-[11px] px-1.5 rounded bg-slate-200 text-slate-700">
+                    {unassignedCount}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ====================================================================
+            JIRA ISSUE TYPES & FILTER TOOLBAR (All Types, Story, Task, Bug, Epic, Search)
+           ==================================================================== */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search Jira key, title, label..."
+                className="pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white w-52"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Jira Issue Type Filter Buttons (All, Story, Task, Bug) */}
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setSelectedType('ALL')}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                  selectedType === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All Types ({typeCounts.ALL})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedType(IssueType.STORY)}
+                className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  selectedType === IssueType.STORY
+                    ? 'bg-white text-emerald-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <IssueTypeIcon type={IssueType.STORY} className="w-3.5 h-3.5" />
+                Story ({typeCounts[IssueType.STORY]})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedType(IssueType.TASK)}
+                className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  selectedType === IssueType.TASK
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <IssueTypeIcon type={IssueType.TASK} className="w-3.5 h-3.5" />
+                Task ({typeCounts[IssueType.TASK]})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedType(IssueType.BUG)}
+                className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  selectedType === IssueType.BUG
+                    ? 'bg-white text-red-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <IssueTypeIcon type={IssueType.BUG} className="w-3.5 h-3.5" />
+                Bug ({typeCounts[IssueType.BUG]})
+              </button>
+            </div>
+
+            {/* Epic Filter Dropdown */}
+            <select
+              value={selectedEpicId || ''}
+              onChange={(e) => setSelectedEpicId(e.target.value || null)}
+              aria-label="Filter by Epic"
+              className="px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:border-blue-600"
+            >
+              <option value="">All Epics</option>
+              {epics.map((ep) => (
+                <option key={ep.id} value={ep.id}>
+                  {ep.key}: {ep.title}
+                </option>
+              ))}
+            </select>
+
+            {/* Quick Toggle: High Priority */}
+            <button
+              type="button"
+              onClick={() => setHighPriorityOnly(!highPriorityOnly)}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                highPriorityOnly
+                  ? 'bg-orange-50 border-orange-500 text-orange-700'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              High / Highest Priority
+            </button>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-xs font-medium text-blue-600 hover:text-blue-800 px-2 py-1"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          <div className="text-xs text-slate-500">
+            Showing <strong>{activeSelectedUsers.length}</strong> user board
+            {activeSelectedUsers.length > 1 ? 's' : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Board Canvas */}
+      {!activeSprint && project.template === 'Scrum' ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
+          <div className="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+            <Layers className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900">
+            No Active Sprint Running
+          </h3>
+          <p className="text-xs text-slate-600 max-w-md mt-1 mb-4">
+            Head to the Backlog to plan your sprint scope and start the next iteration.
+          </p>
+          <button
+            type="button"
+            onClick={onNavigateToBacklog}
+            className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Go to Backlog
+          </button>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-6 space-y-2">
+          {activeSelectedUsers.map((userObj, idx) => {
+            const isBelowCenterLine = idx > 0;
+            const isShowingDown = showBelowUserMap[userObj.id] !== false;
+            const userIssueCount = filteredIssues.filter((i) =>
+              userObj.id === 'UNASSIGNED'
+                ? !i.assigneeId
+                : i.assigneeId === userObj.id
+            ).length;
+
+            return (
+              <React.Fragment key={userObj.id}>
+                {/* HORIZONTAL CENTER LINE BETWEEN USER BOARDS WITH SHOW DOWN / HIDE BELOW BUTTON */}
+                {isBelowCenterLine && (
+                  <div className="relative py-6 flex items-center justify-center select-none">
+                    {/* Horizontal Center Line across the middle */}
+                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-slate-300" />
+
+                    {/* Center Line Button to Show Down or Hide Below User's Board */}
+                    <div className="relative z-10 flex items-center gap-2 bg-white px-4 py-1.5 rounded-full border-2 border-slate-400 shadow-sm">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Center Line
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleShowBelowUser(userObj.id)}
+                        className={`px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                          isShowingDown
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-slate-800 text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        {isShowingDown ? (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5" />
+                            Hide Below ({userObj.name}&rsquo;s Board)
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5" />
+                            Show Down ({userObj.name}&rsquo;s Board · {userIssueCount} tasks)
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* User's 5-Column Jira Kanban Board */}
+                {(!isBelowCenterLine || isShowingDown) &&
+                  renderUserFiveColumnBoard(userObj)}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

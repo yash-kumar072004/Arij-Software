@@ -486,9 +486,11 @@ export default function App() {
       description: '',
       type: payload.type,
       status: payload.status,
-      priority: IssuePriority.MEDIUM,
+      priority: payload.priority || IssuePriority.MEDIUM,
       assigneeId:
-        workspaceScopeMode === 'MY_OWN'
+        payload.assigneeId !== undefined
+          ? payload.assigneeId
+          : workspaceScopeMode === 'MY_OWN'
           ? workspace.currentUserId
           : activeProject.defaultAssigneeId || workspace.currentUserId,
       reporterId: workspace.currentUserId,
@@ -534,11 +536,12 @@ export default function App() {
   };
 
   const handleQuickCreatePersonalIssue = (payload) => {
+    const targetAssigneeId = payload.assigneeId || currentUser.id;
     const personalProj =
       workspace.projects.find(
         (p) =>
-          p.ownerUserId === currentUser.id ||
-          p.id === `prj-personal-${currentUser.id}`
+          p.ownerUserId === targetAssigneeId ||
+          p.id === `prj-personal-${targetAssigneeId}`
       ) || activeProject;
     const personalSprint = workspace.sprints.find(
       (s) => s.projectId === personalProj.id && s.status === SprintStatus.ACTIVE
@@ -552,11 +555,11 @@ export default function App() {
       projectId: personalProj.id,
       key: newKey,
       title: payload.title,
-      description: `Created in ${currentUser.name}'s Personal Workspace.`,
+      description: `Created in personal workspace board.`,
       type: payload.type,
       status: payload.status,
       priority: IssuePriority.MEDIUM,
-      assigneeId: currentUser.id,
+      assigneeId: targetAssigneeId,
       reporterId: currentUser.id,
       epicId: null,
       sprintId: personalSprint ? personalSprint.id : null,
@@ -1972,8 +1975,13 @@ export default function App() {
                 setActiveTab(NavigationTab.BOARD);
               }}
               onSelectIssue={(id) => setSelectedIssueId(id)}
-              onUpdateIssueStatus={(id, status) =>
-                handleUpdateIssue(id, { status })
+              onUpdateIssueStatus={(id, status, targetUserId) =>
+                handleUpdateIssue(
+                  id,
+                  targetUserId !== undefined
+                    ? { status, assigneeId: targetUserId }
+                    : { status }
+                )
               }
               onQuickCreatePersonalIssue={handleQuickCreatePersonalIssue}
               onAddUserAccount={(u) => handleAddUser(u, true)}
@@ -1992,8 +2000,13 @@ export default function App() {
               users={workspace.users}
               currentUserId={workspace.currentUserId}
               onSelectIssue={(id) => setSelectedIssueId(id)}
-              onUpdateIssueStatus={(id, status) =>
-                handleUpdateIssue(id, { status })
+              onUpdateIssueStatus={(id, status, targetUserId) =>
+                handleUpdateIssue(
+                  id,
+                  targetUserId !== undefined
+                    ? { status, assigneeId: targetUserId }
+                    : { status }
+                )
               }
               onQuickCreateIssue={handleQuickCreateIssue}
               onOpenCompleteSprintModal={() => setShowCompleteSprintModal(true)}

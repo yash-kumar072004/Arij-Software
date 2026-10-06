@@ -1,90 +1,40 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Calendar,
   CheckSquare,
   ChevronDown,
   ChevronUp,
   Eye,
   EyeOff,
-  FolderKanban,
+  MessageSquare,
   Plus,
   Square,
   Trash2,
-  UserCheck,
   UserPlus,
+  Users,
 } from 'lucide-react';
 import {
+  IssuePriority,
   IssueStatus,
   IssueType,
 } from '../types/jira.js';
 import {
   formatShortDate,
+  isOverdue,
+  ISSUE_TYPE_CONFIG,
   IssueTypeIcon,
-  PRIORITY_CONFIG,
   PriorityIcon,
   STATUS_CONFIG,
   STATUS_ORDER,
   UserAvatar,
 } from './JiraPrimitives.jsx';
 
-const PERSONAL_SECTIONS = [
-  {
-    id: 'STATUS:TODO',
-    kind: 'STATUS',
-    value: IssueStatus.TODO,
-    label: 'To Do',
-    badgeClass: 'bg-slate-800 text-white border-slate-800',
-    accent: 'border-t-slate-500',
-  },
-  {
-    id: 'TYPE:STORY',
-    kind: 'TYPE',
-    value: IssueType.STORY,
-    label: 'Story',
-    badgeClass: 'bg-emerald-600 text-white border-emerald-600',
-    accent: 'border-t-emerald-600',
-  },
-  {
-    id: 'STATUS:IN_PROGRESS',
-    kind: 'STATUS',
-    value: IssueStatus.IN_PROGRESS,
-    label: 'In Progress',
-    badgeClass: 'bg-blue-600 text-white border-blue-600',
-    accent: 'border-t-blue-600',
-  },
-  {
-    id: 'TYPE:TASK',
-    kind: 'TYPE',
-    value: IssueType.TASK,
-    label: 'Task',
-    badgeClass: 'bg-sky-600 text-white border-sky-600',
-    accent: 'border-t-sky-600',
-  },
-  {
-    id: 'TYPE:BUG',
-    kind: 'TYPE',
-    value: IssueType.BUG,
-    label: 'Bug',
-    badgeClass: 'bg-red-600 text-white border-red-600',
-    accent: 'border-t-red-600',
-  },
-  {
-    id: 'STATUS:DONE',
-    kind: 'STATUS',
-    value: IssueStatus.DONE,
-    label: 'Done',
-    badgeClass: 'bg-teal-600 text-white border-teal-600',
-    accent: 'border-t-teal-600',
-  },
-];
-
 export const MyWorkspaceView = ({
   currentUser,
   users,
-  projects,
   allIssues,
   personalTodos,
   onSwitchUser,
-  onSelectProject,
   onSelectIssue,
   onUpdateIssueStatus,
   onQuickCreatePersonalIssue,
@@ -93,17 +43,23 @@ export const MyWorkspaceView = ({
   onTogglePersonalTodo,
   onDeletePersonalTodo,
 }) => {
-  // Page-wise & Center-line split state for the user's own issues
-  const [selectedSectionIds, setSelectedSectionIds] = useState([
-    'STATUS:TODO',
-    'TYPE:STORY',
-  ]);
-  const [showBelowMap, setShowBelowMap] = useState({});
+  // Selected users for Page-Wise / Center-Line Split View
+  const [selectedUserIds, setSelectedUserIds] = useState(() => {
+    const firstId = currentUser.id;
+    const secondUser = users.find((u) => u.id !== firstId);
+    return secondUser ? [firstId, secondUser.id] : [firstId];
+  });
+  const [showBelowUserMap, setShowBelowUserMap] = useState({});
+  const [selectedType, setSelectedType] = useState('ALL');
 
-  // Quick add issue in user's personal workspace
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskType, setNewTaskType] = useState(IssueType.STORY);
-  const [newTaskStatus, setNewTaskStatus] = useState(IssueStatus.TODO);
+  // Drag & Drop State across columns & users
+  const [draggedIssueId, setDraggedIssueId] = useState(null);
+  const [dragOverColumnKey, setDragOverColumnKey] = useState(null);
+
+  // Quick inline create per user + status column
+  const [quickCreateKey, setQuickCreateKey] = useState(null);
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickType, setQuickType] = useState(IssueType.STORY);
 
   // Personal private checklist item
   const [newTodoText, setNewTodoText] = useState('');
@@ -115,62 +71,51 @@ export const MyWorkspaceView = ({
   const [userRole, setUserRole] = useState('Software Engineer');
   const [userDept, setUserDept] = useState('Engineering');
 
-  // Issues belonging to or assigned to this specific user
-  const myIssues = useMemo(() => {
-    return allIssues.filter(
-      (i) =>
-        i.type !== IssueType.EPIC &&
-        (i.assigneeId === currentUser.id ||
-          projects.some(
-            (p) => p.id === i.projectId && p.ownerUserId === currentUser.id
-          ))
-    );
-  }, [allIssues, currentUser.id, projects]);
-
-  const myPersonalProjects = useMemo(() => {
-    return projects.filter(
-      (p) => p.ownerUserId === currentUser.id || p.leadId === currentUser.id
-    );
-  }, [projects, currentUser.id]);
-
-  const handleToggleSection = (secId) => {
-    setSelectedSectionIds((prev) => {
-      if (prev.includes(secId)) {
+  const handleToggleUser = (userId) => {
+    setSelectedUserIds((prev) => {
+      if (prev.includes(userId)) {
         if (prev.length === 1) return prev;
-        return prev.filter((x) => x !== secId);
+        return prev.filter((id) => id !== userId);
       }
-      setShowBelowMap((m) => ({ ...m, [secId]: true }));
-      return [...prev, secId];
+      setShowBelowUserMap((m) => ({ ...m, [userId]: true }));
+      return [...prev, userId];
     });
   };
 
-  const handleSelectOnly = (secId) => {
-    setSelectedSectionIds([secId]);
+  const handleSelectOnlyUser = (userId) => {
+    setSelectedUserIds([userId]);
+    onSwitchUser(userId);
   };
 
-  const handleToggleShowBelow = (secId) => {
-    setShowBelowMap((prev) => {
-      const curr = prev[secId] !== false;
-      return { ...prev, [secId]: !curr };
+  const handleToggleShowBelowUser = (userId) => {
+    setShowBelowUserMap((prev) => {
+      const curr = prev[userId] !== false;
+      return { ...prev, [userId]: !curr };
     });
   };
 
-  const getSectionIssues = (sec) => {
-    if (sec.kind === 'STATUS') {
-      return myIssues.filter((i) => i.status === sec.value);
-    }
-    return myIssues.filter((i) => i.type === sec.value);
+  const handleDragStart = (e, issueId) => {
+    setDraggedIssueId(issueId);
+    e.dataTransfer.setData('text/plain', issueId);
+    e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleCreateTaskSubmit = (e) => {
+  const handleDragOver = (e, colKey) => {
     e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-    onQuickCreatePersonalIssue({
-      title: newTaskTitle.trim(),
-      type: newTaskType,
-      status: newTaskStatus,
-    });
-    setNewTaskTitle('');
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverColumnKey !== colKey) {
+      setDragOverColumnKey(colKey);
+    }
+  };
+
+  const handleDrop = (e, status, targetUserId) => {
+    e.preventDefault();
+    const issueId = e.dataTransfer.getData('text/plain') || draggedIssueId;
+    if (issueId) {
+      onUpdateIssueStatus(issueId, status, targetUserId);
+    }
+    setDraggedIssueId(null);
+    setDragOverColumnKey(null);
   };
 
   const handleCreateAccountSubmit = (e) => {
@@ -196,61 +141,336 @@ export const MyWorkspaceView = ({
     setNewTodoText('');
   };
 
-  const activeSections = useMemo(() => {
-    return selectedSectionIds
-      .map((id) => PERSONAL_SECTIONS.find((s) => s.id === id))
+  const activeSelectedUsers = useMemo(() => {
+    const list = selectedUserIds
+      .map((id) => users.find((u) => u.id === id))
       .filter(Boolean);
-  }, [selectedSectionIds]);
+    return list.length > 0 ? list : [currentUser];
+  }, [selectedUserIds, users, currentUser]);
+
+  const nonEpicIssues = useMemo(() => {
+    return allIssues.filter(
+      (i) =>
+        i.type !== IssueType.EPIC &&
+        i.type !== IssueType.SUBTASK &&
+        (selectedType === 'ALL' || i.type === selectedType)
+    );
+  }, [allIssues, selectedType]);
+
+  const renderUserFiveColumnBoard = (userObj) => {
+    const userIssues = nonEpicIssues.filter((i) => i.assigneeId === userObj.id);
+    const totalPts = userIssues.reduce((s, i) => s + (i.storyPoints || 0), 0);
+    const donePts = userIssues
+      .filter((i) => i.status === IssueStatus.DONE)
+      .reduce((s, i) => s + (i.storyPoints || 0), 0);
+
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+        <div className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <UserAvatar user={userObj} size="md" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-white">
+                  {userObj.name}&rsquo;s Personal 5-Column Jira Board
+                </h2>
+                <span className="text-[11px] px-2 py-0.5 rounded bg-blue-600/30 border border-blue-400/30 text-blue-200 font-semibold">
+                  {userObj.role}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                {userObj.department} · {userIssues.length} tasks · {donePts}/
+                {totalPts} pts Done
+              </p>
+            </div>
+          </div>
+
+          {activeSelectedUsers.length > 1 && (
+            <button
+              type="button"
+              onClick={() => handleSelectOnlyUser(userObj.id)}
+              className="px-3 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-md"
+            >
+              Show Only {userObj.name.split(' ')[0]}
+            </button>
+          )}
+        </div>
+
+        {/* Classic 5-Column Jira System (TO DO | IN PROGRESS | IN REVIEW | QA TESTING | DONE) */}
+        <div className="p-4 overflow-x-auto bg-slate-50">
+          <div className="grid grid-cols-5 gap-4 min-w-[1080px]">
+            {STATUS_ORDER.map((status) => {
+              const colConfig = STATUS_CONFIG[status];
+              const colIssues = userIssues.filter((i) => i.status === status);
+              const colPoints = colIssues.reduce(
+                (s, i) => s + (i.storyPoints || 0),
+                0
+              );
+              const colKey = `${userObj.id}:${status}`;
+              const isDragTarget = dragOverColumnKey === colKey;
+
+              return (
+                <div
+                  key={colKey}
+                  onDragOver={(e) => handleDragOver(e, colKey)}
+                  onDragLeave={() => setDragOverColumnKey(null)}
+                  onDrop={(e) => handleDrop(e, status, userObj.id)}
+                  className={`flex flex-col rounded-lg border border-t-4 ${
+                    colConfig.accentBorder
+                  } ${
+                    isDragTarget
+                      ? 'bg-blue-50/60 border-blue-400'
+                      : 'bg-slate-100/80 border-slate-200'
+                  } min-h-[320px] transition-colors`}
+                >
+                  <div className="p-3 border-b border-slate-200/80 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold tracking-wider uppercase text-slate-700">
+                        {colConfig.shortLabel}
+                      </span>
+                      <span className="font-mono text-xs font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                        {colIssues.length}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[11px] text-slate-500">
+                      {colPoints} pts
+                    </span>
+                  </div>
+
+                  <div className="flex-1 p-2.5 flex flex-col gap-2.5 overflow-y-auto">
+                    {colIssues.map((issue) => {
+                      const overdue = isOverdue(issue.dueDate, issue.status);
+                      const typeInfo =
+                        ISSUE_TYPE_CONFIG[issue.type] ||
+                        ISSUE_TYPE_CONFIG[IssueType.TASK];
+
+                      return (
+                        <div
+                          key={issue.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, issue.id)}
+                          onDragEnd={() => {
+                            setDraggedIssueId(null);
+                            setDragOverColumnKey(null);
+                          }}
+                          onClick={() => onSelectIssue(issue.id)}
+                          className="group bg-white border border-slate-200 rounded-md p-3.5 shadow-2xs hover:border-blue-500 hover:shadow-md transition-all cursor-pointer flex flex-col gap-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${typeInfo.bgBadge}`}
+                              >
+                                <IssueTypeIcon
+                                  type={issue.type}
+                                  className="w-3 h-3"
+                                />
+                                {typeInfo.label}
+                              </span>
+                              <span className="font-mono text-xs font-semibold text-slate-500 group-hover:text-blue-600">
+                                {issue.key}
+                              </span>
+                            </div>
+                            {issue.dueDate && (
+                              <span
+                                className={`font-mono text-[11px] flex items-center gap-1 ${
+                                  overdue
+                                    ? 'text-red-600 font-semibold'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                <Calendar className="w-3 h-3" />
+                                {formatShortDate(issue.dueDate)}
+                              </span>
+                            )}
+                          </div>
+
+                          <h4 className="text-[13px] font-medium text-slate-900 leading-snug line-clamp-2">
+                            {issue.title}
+                          </h4>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <PriorityIcon
+                                priority={issue.priority}
+                                className="w-3.5 h-3.5"
+                              />
+                              {issue.storyPoints > 0 && (
+                                <span className="font-mono text-[11px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {issue.storyPoints}p
+                                </span>
+                              )}
+                              {issue.comments.length > 0 && (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-mono">
+                                  <MessageSquare className="w-3 h-3" />
+                                  {issue.comments.length}
+                                </span>
+                              )}
+                            </div>
+                            <UserAvatar user={userObj} size="xs" />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {colIssues.length === 0 && (
+                      <div className="flex-1 min-h-[90px] border border-dashed border-slate-300 rounded-md flex items-center justify-center text-xs text-slate-400">
+                        Drop {userObj.initials}&rsquo;s {colConfig.shortLabel} issues
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-2.5 border-t border-slate-200/60">
+                    {quickCreateKey === colKey ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!quickTitle.trim()) return;
+                          onQuickCreatePersonalIssue({
+                            title: quickTitle.trim(),
+                            type: quickType,
+                            status,
+                            assigneeId: userObj.id,
+                          });
+                          setQuickTitle('');
+                          setQuickCreateKey(null);
+                        }}
+                        className="bg-white p-2.5 rounded-md border border-blue-500 space-y-2"
+                      >
+                        <input
+                          type="text"
+                          autoFocus
+                          value={quickTitle}
+                          onChange={(e) => setQuickTitle(e.target.value)}
+                          placeholder={`New task for ${userObj.name.split(' ')[0]}...`}
+                          className="w-full text-xs text-slate-900 focus:outline-none"
+                        />
+                        <div className="flex items-center justify-between pt-1">
+                          <select
+                            value={quickType}
+                            onChange={(e) => setQuickType(e.target.value)}
+                            className="text-[11px] bg-slate-100 border border-slate-200 rounded px-1.5 py-1"
+                          >
+                            <option value={IssueType.STORY}>Story</option>
+                            <option value={IssueType.TASK}>Task</option>
+                            <option value={IssueType.BUG}>Bug</option>
+                          </select>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setQuickCreateKey(null)}
+                              className="px-2 py-1 text-[11px] text-slate-500"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-blue-600 text-white rounded"
+                            >
+                              Create
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickCreateKey(colKey);
+                          setQuickTitle('');
+                        }}
+                        className="w-full py-1.5 px-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Create issue
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-slate-50 overflow-y-auto">
-      {/* Personal Workspace Header */}
+      {/* Header */}
       <div className="px-6 py-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <UserAvatar user={currentUser} size="md" />
           <div>
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <span className="font-semibold text-blue-700">
-                Personal User Space
+                User Workspace &amp; Center-Line Split Boards
               </span>
               <span>·</span>
               <span>{currentUser.email}</span>
-              <span>·</span>
-              <span>{currentUser.department}</span>
             </div>
             <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-              {currentUser.name}&rsquo;s Own Workspace & Assigned Board
+              Every User&rsquo;s Own 5-Column Jira Board
             </h1>
           </div>
         </div>
 
-        {/* User Account Switcher & New User Account Button */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-md border border-slate-200">
-            {users.map((u) => {
-              const isCurrent = u.id === currentUser.id;
-              return (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => onSwitchUser(u.id)}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                    isCurrent
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-700 hover:bg-white'
-                  }`}
-                >
-                  <span>{u.initials}</span>
-                  <span className="hidden sm:inline">{u.name.split(' ')[0]}</span>
-                </button>
-              );
-            })}
+        <div className="flex items-center gap-2.5">
+          {/* Jira Issue Type Filter */}
+          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setSelectedType('ALL')}
+              className={`px-2.5 py-1 rounded text-xs font-semibold ${
+                selectedType === 'ALL'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600'
+              }`}
+            >
+              All Types
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedType(IssueType.STORY)}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 ${
+                selectedType === IssueType.STORY
+                  ? 'bg-white text-emerald-700 shadow-2xs'
+                  : 'text-slate-600'
+              }`}
+            >
+              <IssueTypeIcon type={IssueType.STORY} className="w-3 h-3" />
+              Story
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedType(IssueType.TASK)}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 ${
+                selectedType === IssueType.TASK
+                  ? 'bg-white text-blue-700 shadow-2xs'
+                  : 'text-slate-600'
+              }`}
+            >
+              <IssueTypeIcon type={IssueType.TASK} className="w-3 h-3" />
+              Task
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedType(IssueType.BUG)}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 ${
+                selectedType === IssueType.BUG
+                  ? 'bg-white text-red-700 shadow-2xs'
+                  : 'text-slate-600'
+              }`}
+            >
+              <IssueTypeIcon type={IssueType.BUG} className="w-3 h-3" />
+              Bug
+            </button>
           </div>
 
           <button
             type="button"
             onClick={() => setShowCreateUser(!showCreateUser)}
-            className="px-3 py-1.5 text-xs font-semibold bg-slate-900 text-white rounded-md hover:bg-slate-800 flex items-center gap-1.5"
+            className="px-3.5 py-2 text-xs font-semibold bg-slate-900 text-white rounded-md hover:bg-slate-800 flex items-center gap-1.5"
           >
             <UserPlus className="w-3.5 h-3.5" />
             New User Account
@@ -259,293 +479,95 @@ export const MyWorkspaceView = ({
       </div>
 
       <div className="p-6 max-w-7xl mx-auto w-full space-y-6">
-        {/* Create New User Account Drawer (Each user automatically gets their own workspace!) */}
         {showCreateUser && (
           <form
             onSubmit={handleCreateAccountSubmit}
             className="p-5 bg-white border-2 border-blue-600 rounded-xl shadow-md space-y-4"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Create Your Own User Account & Dedicated Workspace
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Creating a user automatically provisions their own private project, active sprint, and personal task board.
-                </p>
-              </div>
-            </div>
+            <h3 className="text-sm font-bold text-slate-900">
+              Create New User Account (Automatically Creates Their Own 5-Column Board)
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Your Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="e.g. Yash Kumar"
-                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  placeholder="yash@kawach.ai"
-                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Role
-                </label>
-                <input
-                  type="text"
-                  value={userRole}
-                  onChange={(e) => setUserRole(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-md"
-                />
-              </div>
-              <div className="flex items-end gap-2">
-                <button
-                  type="submit"
-                  className="w-full py-1.5 px-3 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Create & Switch to User
-                </button>
-              </div>
+              <input
+                type="text"
+                required
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                placeholder="Full Name (e.g. Yash Kumar)"
+                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-md"
+              />
+              <input
+                type="email"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                placeholder="Email (e.g. yash@kawach.ai)"
+                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-md"
+              />
+              <input
+                type="text"
+                value={userRole}
+                onChange={(e) => setUserRole(e.target.value)}
+                placeholder="Role"
+                className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-md"
+              />
+              <button
+                type="submit"
+                className="py-1.5 px-3 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Create User
+              </button>
             </div>
           </form>
         )}
 
-        {/* Top Row: User's Own Projects + Quick Add Personal Task + Personal Private Checklist */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left 7 cols: My Personal Projects & Quick Issue Creator */}
-          <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FolderKanban className="w-4 h-4 text-blue-600" />
-                <h2 className="text-sm font-bold text-slate-900">
-                  {currentUser.name}&rsquo;s Dedicated Projects ({myPersonalProjects.length})
-                </h2>
-              </div>
-              <span className="text-xs font-mono text-slate-500">
-                {myIssues.length} personal & assigned tasks
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {myPersonalProjects.map((proj) => (
-                <div
-                  key={proj.id}
-                  onClick={() => onSelectProject(proj.id)}
-                  className="p-3.5 rounded-lg border border-slate-200 hover:border-blue-600 bg-slate-50/60 hover:bg-blue-50/30 cursor-pointer transition-all"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono text-xs font-bold text-blue-700">
-                      {proj.key}
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                      {proj.isPersonal ? 'Personal Space' : 'Lead Project'}
-                    </span>
-                  </div>
-                  <div className="text-xs font-bold text-slate-900 truncate">
-                    {proj.name}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1 line-clamp-1">
-                    {proj.description}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Quick Add Task to User's Personal Workspace */}
-            <form
-              onSubmit={handleCreateTaskSubmit}
-              className="pt-3 border-t border-slate-200 flex flex-wrap items-center gap-2"
-            >
-              <select
-                value={newTaskType}
-                onChange={(e) => setNewTaskType(e.target.value)}
-                className="px-2.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-300 rounded-md"
-              >
-                <option value={IssueType.STORY}>Story</option>
-                <option value={IssueType.TASK}>Task</option>
-                <option value={IssueType.BUG}>Bug</option>
-              </select>
-              <select
-                value={newTaskStatus}
-                onChange={(e) => setNewTaskStatus(e.target.value)}
-                className="px-2.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-300 rounded-md"
-              >
-                {STATUS_ORDER.map((st) => (
-                  <option key={st} value={st}>
-                    {STATUS_CONFIG[st].label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                placeholder={`Add a new task directly to ${currentUser.name}'s personal board...`}
-                className="flex-1 min-w-[200px] px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-md focus:outline-none focus:border-blue-600"
-              />
-              <button
-                type="submit"
-                className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add My Task
-              </button>
-            </form>
-          </div>
-
-          {/* Right 5 cols: Personal Private Notes / Quick Checklist (Isolated per user) */}
-          <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl p-5 flex flex-col justify-between space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-4 h-4 text-emerald-600" />
-                  <h2 className="text-sm font-bold text-slate-900">
-                    {currentUser.name}&rsquo;s Private Scratchpad
-                  </h2>
-                </div>
-                <span className="text-[11px] text-slate-400">
-                  Only visible to {currentUser.initials}
-                </span>
-              </div>
-
-              <div className="divide-y divide-slate-100 max-h-40 overflow-y-auto">
-                {personalTodos.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-4 text-center">
-                    No personal reminders yet for {currentUser.name}.
-                  </p>
-                ) : (
-                  personalTodos.map((item) => (
-                    <div
-                      key={item.id}
-                      className="py-2 flex items-center justify-between gap-2 text-xs"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onTogglePersonalTodo(item.id)}
-                        className="flex items-center gap-2 text-left flex-1"
-                      >
-                        {item.done ? (
-                          <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
-                        ) : (
-                          <Square className="w-4 h-4 text-slate-400 shrink-0" />
-                        )}
-                        <span
-                          className={
-                            item.done
-                              ? 'line-through text-slate-400'
-                              : 'text-slate-800 font-medium'
-                          }
-                        >
-                          {item.text}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeletePersonalTodo(item.id)}
-                        className="text-slate-400 hover:text-red-600 p-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <form onSubmit={handleAddTodoSubmit} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newTodoText}
-                onChange={(e) => setNewTodoText(e.target.value)}
-                placeholder={`Add private note for ${currentUser.name}...`}
-                className="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-blue-600"
-              />
-              <button
-                type="submit"
-                className="px-3 py-1.5 text-xs font-semibold bg-slate-900 text-white rounded-md hover:bg-slate-800"
-              >
-                Add
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* PAGE-WISE & CENTER-LINE SPLIT SELECTOR FOR USER'S OWN TASKS */}
+        {/* USER SELECTOR BAR */}
         <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                {currentUser.name}&rsquo;s Page-Wise Task View (Click 1 for Single Page, Click 2+ for Center-Line Split)
-              </h3>
-            </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedSectionIds(['STATUS:TODO'])}
-                className="px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 rounded text-slate-700"
-              >
-                Only To Do
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedSectionIds(['TYPE:STORY'])}
-                className="px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 rounded text-slate-700"
-              >
-                Only Story
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedSectionIds(['STATUS:TODO', 'TYPE:STORY']);
-                  setShowBelowMap({ 'TYPE:STORY': true });
-                }}
-                className="px-2.5 py-1 text-[11px] font-semibold bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded text-blue-700"
-              >
-                To Do + Story (Center Line Split)
-              </button>
+              <Users className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-bold text-slate-900">
+                Select User(s) to View Their Board:
+              </span>
+              <span className="text-xs text-slate-500">
+                Click <strong>1 user</strong> to show only their board, or click{' '}
+                <strong>2+ users</strong> to show both with a{' '}
+                <strong>Center Line &amp; Show/Hide Down button</strong>.
+              </span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {PERSONAL_SECTIONS.map((sec) => {
-              const isSelected = selectedSectionIds.includes(sec.id);
-              const count = getSectionIssues(sec).length;
-              const orderNum = selectedSectionIds.indexOf(sec.id) + 1;
+            {users.map((u) => {
+              const isSelected = selectedUserIds.includes(u.id);
+              const orderNum = selectedUserIds.indexOf(u.id) + 1;
+              const count = nonEpicIssues.filter(
+                (i) => i.assigneeId === u.id
+              ).length;
 
               return (
                 <div
-                  key={sec.id}
+                  key={u.id}
                   className={`inline-flex items-center rounded-md border text-xs overflow-hidden ${
                     isSelected
-                      ? `${sec.badgeClass}`
+                      ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   <button
                     type="button"
-                    onClick={() => handleToggleSection(sec.id)}
-                    className="px-3 py-1.5 font-semibold flex items-center gap-1.5"
+                    onClick={() => handleToggleUser(u.id)}
+                    className="px-3 py-1.5 font-semibold flex items-center gap-2"
                   >
-                    {isSelected && (
+                    {isSelected ? (
                       <span className="w-4 h-4 rounded-full bg-white/25 text-white font-mono text-[10px] flex items-center justify-center">
                         {orderNum}
                       </span>
+                    ) : (
+                      <span className="w-4 h-4 rounded bg-slate-200 text-slate-700 font-mono text-[10px] flex items-center justify-center">
+                        {u.initials}
+                      </span>
                     )}
-                    <span>{sec.label}</span>
+                    <span>{u.name}</span>
                     <span
                       className={`font-mono text-[11px] px-1.5 rounded ${
                         isSelected
@@ -556,10 +578,11 @@ export const MyWorkspaceView = ({
                       {count}
                     </span>
                   </button>
-                  {!(selectedSectionIds.length === 1 && isSelected) && (
+
+                  {!(selectedUserIds.length === 1 && isSelected) && (
                     <button
                       type="button"
-                      onClick={() => handleSelectOnly(sec.id)}
+                      onClick={() => handleSelectOnlyUser(u.id)}
                       className={`px-2 py-1.5 text-[10px] font-bold border-l ${
                         isSelected
                           ? 'border-white/20 hover:bg-black/20 text-white'
@@ -575,15 +598,17 @@ export const MyWorkspaceView = ({
           </div>
         </div>
 
-        {/* RENDER SELECTED SECTIONS WITH CENTER LINE & SHOW/HIDE DOWN BUTTON */}
+        {/* USER BOARDS WITH CENTER LINE & SHOW DOWN BUTTON */}
         <div className="space-y-2">
-          {activeSections.map((sec, idx) => {
-            const list = getSectionIssues(sec);
+          {activeSelectedUsers.map((userObj, idx) => {
             const isBelowCenterLine = idx > 0;
-            const isShowingDown = showBelowMap[sec.id] !== false;
+            const isShowingDown = showBelowUserMap[userObj.id] !== false;
+            const count = nonEpicIssues.filter(
+              (i) => i.assigneeId === userObj.id
+            ).length;
 
             return (
-              <React.Fragment key={sec.id}>
+              <React.Fragment key={userObj.id}>
                 {isBelowCenterLine && (
                   <div className="relative py-6 flex items-center justify-center select-none">
                     <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-slate-300" />
@@ -594,7 +619,7 @@ export const MyWorkspaceView = ({
                       <span className="text-slate-300">|</span>
                       <button
                         type="button"
-                        onClick={() => handleToggleShowBelow(sec.id)}
+                        onClick={() => handleToggleShowBelowUser(userObj.id)}
                         className={`px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
                           isShowingDown
                             ? 'bg-blue-600 text-white hover:bg-blue-700'
@@ -604,13 +629,13 @@ export const MyWorkspaceView = ({
                         {isShowingDown ? (
                           <>
                             <EyeOff className="w-3.5 h-3.5" />
-                            Hide Below ({sec.label})
+                            Hide Below ({userObj.name}&rsquo;s Board)
                             <ChevronUp className="w-3.5 h-3.5" />
                           </>
                         ) : (
                           <>
                             <Eye className="w-3.5 h-3.5" />
-                            Show Down ({sec.label} · {list.length})
+                            Show Down ({userObj.name}&rsquo;s Board · {count} tasks)
                             <ChevronDown className="w-3.5 h-3.5" />
                           </>
                         )}
@@ -619,95 +644,69 @@ export const MyWorkspaceView = ({
                   </div>
                 )}
 
-                {(!isBelowCenterLine || isShowingDown) && (
-                  <div
-                    className={`bg-white rounded-xl border border-slate-200 border-t-4 ${sec.accent} shadow-xs overflow-hidden`}
-                  >
-                    <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span
-                          className={`px-2.5 py-0.5 rounded text-xs font-bold uppercase ${sec.badgeClass}`}
-                        >
-                          {sec.label}
-                        </span>
-                        <span className="text-sm font-bold text-slate-900">
-                          {currentUser.name}&rsquo;s {sec.label} Items ({list.length})
-                        </span>
-                      </div>
-                      {activeSections.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleSelectOnly(sec.id)}
-                          className="text-xs font-semibold text-blue-600 hover:underline"
-                        >
-                          Show Only {sec.label}
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="p-5">
-                      {list.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-slate-400">
-                          No {sec.label} items assigned to {currentUser.name}.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {list.map((iss) => (
-                            <div
-                              key={iss.id}
-                              onClick={() => onSelectIssue(iss.id)}
-                              className="p-3.5 bg-white border border-slate-200 rounded-lg hover:border-blue-500 hover:shadow-sm cursor-pointer transition-all flex flex-col justify-between gap-2.5"
-                            >
-                              <div className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-1.5">
-                                    <IssueTypeIcon type={iss.type} />
-                                    <span className="font-mono text-xs font-bold text-blue-700">
-                                      {iss.key}
-                                    </span>
-                                  </div>
-                                  <div onClick={(e) => e.stopPropagation()}>
-                                    <select
-                                      value={iss.status}
-                                      onChange={(e) =>
-                                        onUpdateIssueStatus(iss.id, e.target.value)
-                                      }
-                                      className={`text-[11px] font-semibold bg-slate-50 border border-slate-200 rounded px-2 py-0.5 ${
-                                        STATUS_CONFIG[iss.status]?.textClass
-                                      }`}
-                                    >
-                                      {STATUS_ORDER.map((st) => (
-                                        <option key={st} value={st}>
-                                          {STATUS_CONFIG[st].label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
-                                <div className="text-sm font-semibold text-slate-900">
-                                  {iss.title}
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
-                                <span className="flex items-center gap-1">
-                                  <PriorityIcon priority={iss.priority} />
-                                  {PRIORITY_CONFIG[iss.priority]?.label}
-                                </span>
-                                <span className="font-mono">
-                                  {iss.storyPoints} pts · Due {formatShortDate(iss.dueDate)}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {(!isBelowCenterLine || isShowingDown) &&
+                  renderUserFiveColumnBoard(userObj)}
               </React.Fragment>
             );
           })}
+        </div>
+
+        {/* Personal Quick Checklist for Active User */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+          <h3 className="text-sm font-bold text-slate-900">
+            {currentUser.name}&rsquo;s Private Personal Checklist
+          </h3>
+          <form onSubmit={handleAddTodoSubmit} className="flex gap-2">
+            <input
+              type="text"
+              value={newTodoText}
+              onChange={(e) => setNewTodoText(e.target.value)}
+              placeholder={`Add a private checklist item for ${currentUser.name}...`}
+              className="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-blue-600"
+            />
+            <button
+              type="submit"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Add Note
+            </button>
+          </form>
+          <div className="space-y-1.5">
+            {(personalTodos || []).map((todo) => (
+              <div
+                key={todo.id}
+                className="flex items-center justify-between px-3 py-2 rounded-md bg-slate-50 border border-slate-200 text-xs"
+              >
+                <button
+                  type="button"
+                  onClick={() => onTogglePersonalTodo(todo.id)}
+                  className="flex items-center gap-2 text-left flex-1"
+                >
+                  {todo.done ? (
+                    <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                  )}
+                  <span
+                    className={
+                      todo.done
+                        ? 'line-through text-slate-400'
+                        : 'text-slate-800 font-medium'
+                    }
+                  >
+                    {todo.text}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeletePersonalTodo(todo.id)}
+                  className="text-slate-400 hover:text-red-600 p-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
