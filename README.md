@@ -1,4 +1,4 @@
-# Jira — Agile Project Management & Issue Tracking (React + TypeScript)
+# Jira — Agile Project Management & Issue Tracking (React + JavaScript)
 
 Full-featured Agile project management and issue tracking application built with React 19, TypeScript, Tailwind CSS, Express, and `@google/genai` multimodal screenshot extraction.
 
