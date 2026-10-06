@@ -3,24 +3,16 @@ import {
   Bookmark,
   Code2,
   Download,
-  Filter,
   LayoutList,
   PanelRight,
   Search,
   SlidersHorizontal,
-  X,
 } from 'lucide-react';
 import {
-  Issue,
   IssuePriority,
   IssueStatus,
   IssueType,
-  Project,
-  ProjectComponent,
-  SavedFilter,
-  Sprint,
-  User,
-} from '../types/jira';
+} from '../types/jira.js';
 import {
   formatShortDate,
   isOverdue,
@@ -29,28 +21,13 @@ import {
   PriorityIcon,
   STATUS_CONFIG,
   STATUS_ORDER,
-  StatusIcon,
   TYPE_CONFIG,
   UserAvatar,
-} from './JiraPrimitives';
+} from './JiraPrimitives.jsx';
 
-interface IssuesNavigatorViewProps {
-  project: Project;
-  issues: Issue[];
-  sprints: Sprint[];
-  components: ProjectComponent[];
-  users: User[];
-  currentUserId: string;
-  savedFilters: SavedFilter[];
-  onSelectIssue: (issueId: string) => void;
-  onUpdateIssue: (issueId: string, updates: Partial<Issue>) => void;
-  onSaveFilter: (name: string, jql: string) => void;
-}
-
-export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
+export const IssuesNavigatorView = ({
   project,
   issues,
-  sprints,
   components,
   users,
   currentUserId,
@@ -59,30 +36,28 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
   onUpdateIssue,
   onSaveFilter,
 }) => {
-  const [queryMode, setQueryMode] = useState<'BASIC' | 'JQL'>('BASIC');
-  const [viewLayout, setViewLayout] = useState<'TABLE' | 'SPLIT'>('TABLE');
-  const [activeFilterId, setActiveFilterId] = useState<string>('flt-all');
-  const [jqlString, setJqlString] = useState<string>('ORDER BY priority DESC');
+  const [queryMode, setQueryMode] = useState('BASIC');
+  const [viewLayout, setViewLayout] = useState('TABLE');
+  const [activeFilterId, setActiveFilterId] = useState('flt-all');
+  const [jqlString, setJqlString] = useState('ORDER BY priority DESC');
 
   // Basic filter states
   const [searchText, setSearchText] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('ALL');
-  const [componentFilter, setComponentFilter] = useState<string>('ALL');
+  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [assigneeFilter, setAssigneeFilter] = useState('ALL');
+  const [componentFilter, setComponentFilter] = useState('ALL');
 
   // Split view selected issue
-  const [splitIssueId, setSplitIssueId] = useState<string | null>(
-    issues[0]?.id || null
-  );
+  const [splitIssueId, setSplitIssueId] = useState(issues[0]?.id || null);
 
   // Save filter inline form
   const [savingFilter, setSavingFilter] = useState(false);
   const [newFilterName, setNewFilterName] = useState('');
 
   const userMap = useMemo(() => {
-    const map: Record<string, User> = {};
+    const map = {};
     users.forEach((u) => {
       map[u.id] = u;
     });
@@ -90,17 +65,16 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
   }, [users]);
 
   const componentMap = useMemo(() => {
-    const map: Record<string, ProjectComponent> = {};
+    const map = {};
     components.forEach((c) => {
       map[c.id] = c;
     });
     return map;
   }, [components]);
 
-  const applySavedFilter = (filter: SavedFilter) => {
+  const applySavedFilter = (filter) => {
     setActiveFilterId(filter.id);
     setJqlString(filter.jql);
-    // Sync basic filters for common system presets
     setSearchText('');
     setComponentFilter('ALL');
     if (filter.id === 'flt-all') {
@@ -165,15 +139,13 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
       if (upper.includes('PRIORITY IN (HIGHEST, HIGH)')) {
         list = list.filter(
           (i) =>
-            i.priority === IssuePriority.HIGHEST || i.priority === IssuePriority.HIGH
+            i.priority === IssuePriority.HIGHEST ||
+            i.priority === IssuePriority.HIGH
         );
       } else if (upper.includes('PRIORITY = HIGHEST')) {
         list = list.filter((i) => i.priority === IssuePriority.HIGHEST);
-      } else if (upper.includes('PRIORITY = HIGH')) {
-        list = list.filter((i) => i.priority === IssuePriority.HIGH);
       }
 
-      // Text search inside JQL e.g. text ~ "keyword"
       const textMatch = jqlString.match(/text\s*~\s*"([^"]+)"/i);
       if (textMatch && textMatch[1]) {
         const kw = textMatch[1].toLowerCase();
@@ -188,56 +160,65 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
       if (upper.includes('ORDER BY PRIORITY DESC')) {
         list.sort(
           (a, b) =>
-            PRIORITY_CONFIG[b.priority].rank - PRIORITY_CONFIG[a.priority].rank
+            PRIORITY_CONFIG[b.priority].weight -
+            PRIORITY_CONFIG[a.priority].weight
         );
       } else if (upper.includes('ORDER BY UPDATED DESC')) {
-        list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        list.sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
       }
       return list;
     }
 
-    // BASIC mode
-    return list
-      .filter((i) => {
-        if (searchText.trim()) {
-          const q = searchText.toLowerCase();
-          if (
-            !i.key.toLowerCase().includes(q) &&
-            !i.title.toLowerCase().includes(q) &&
-            !i.labels.some((l) => l.toLowerCase().includes(q))
-          ) {
-            return false;
-          }
-        }
-        if (typeFilter !== 'ALL' && i.type !== typeFilter) return false;
-        if (statusFilter !== 'ALL') {
-          if (statusFilter === 'NOT_DONE' && i.status === IssueStatus.DONE) return false;
-          if (statusFilter !== 'NOT_DONE' && i.status !== statusFilter) return false;
-        }
-        if (priorityFilter !== 'ALL') {
-          if (
-            priorityFilter === 'HIGH_AND_HIGHEST' &&
-            i.priority !== IssuePriority.HIGHEST &&
-            i.priority !== IssuePriority.HIGH
-          ) {
-            return false;
-          }
-          if (priorityFilter !== 'HIGH_AND_HIGHEST' && i.priority !== priorityFilter) {
-            return false;
-          }
-        }
-        if (assigneeFilter !== 'ALL') {
-          if (assigneeFilter === 'UNASSIGNED' && i.assigneeId !== null) return false;
-          if (assigneeFilter !== 'UNASSIGNED' && i.assigneeId !== assigneeFilter)
-            return false;
-        }
-        if (componentFilter !== 'ALL' && i.componentId !== componentFilter) return false;
-        return true;
-      })
-      .sort(
-        (a, b) =>
-          PRIORITY_CONFIG[b.priority].rank - PRIORITY_CONFIG[a.priority].rank
+    // BASIC FILTER MODE
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      list = list.filter(
+        (i) =>
+          i.key.toLowerCase().includes(q) ||
+          i.title.toLowerCase().includes(q) ||
+          i.description.toLowerCase().includes(q) ||
+          i.labels.some((l) => l.toLowerCase().includes(q))
       );
+    }
+
+    if (typeFilter !== 'ALL') {
+      list = list.filter((i) => i.type === typeFilter);
+    }
+
+    if (statusFilter === 'NOT_DONE') {
+      list = list.filter((i) => i.status !== IssueStatus.DONE);
+    } else if (statusFilter !== 'ALL') {
+      list = list.filter((i) => i.status === statusFilter);
+    }
+
+    if (priorityFilter === 'HIGH_AND_HIGHEST') {
+      list = list.filter(
+        (i) =>
+          i.priority === IssuePriority.HIGHEST ||
+          i.priority === IssuePriority.HIGH
+      );
+    } else if (priorityFilter !== 'ALL') {
+      list = list.filter((i) => i.priority === priorityFilter);
+    }
+
+    if (assigneeFilter === 'UNASSIGNED') {
+      list = list.filter((i) => !i.assigneeId);
+    } else if (assigneeFilter !== 'ALL') {
+      list = list.filter((i) => i.assigneeId === assigneeFilter);
+    }
+
+    if (componentFilter !== 'ALL') {
+      list = list.filter((i) => i.componentId === componentFilter);
+    }
+
+    list.sort(
+      (a, b) =>
+        PRIORITY_CONFIG[b.priority].weight - PRIORITY_CONFIG[a.priority].weight
+    );
+    return list;
   }, [
     issues,
     queryMode,
@@ -255,13 +236,12 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
     const headers = [
       'Key',
       'Type',
-      'Title',
+      'Summary',
       'Status',
       'Priority',
       'Assignee',
-      'StoryPoints',
-      'DueDate',
-      'UpdatedAt',
+      'Story Points',
+      'Due Date',
     ];
     const rows = filteredIssues.map((i) => [
       i.key,
@@ -270,9 +250,8 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
       i.status,
       i.priority,
       i.assigneeId ? userMap[i.assigneeId]?.name || '' : 'Unassigned',
-      i.storyPoints,
+      String(i.storyPoints || 0),
       i.dueDate || '',
-      i.updatedAt,
     ]);
     const csvContent =
       'data:text/csv;charset=utf-8,' +
@@ -286,7 +265,7 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
     document.body.removeChild(link);
   };
 
-  const handleSaveCustomFilter = (e: React.FormEvent) => {
+  const handleSaveCurrentFilter = (e) => {
     e.preventDefault();
     if (!newFilterName.trim()) return;
     onSaveFilter(newFilterName.trim(), jqlString);
@@ -294,66 +273,62 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
     setSavingFilter(false);
   };
 
-  const activeSplitIssue =
-    filteredIssues.find((i) => i.id === splitIssueId) || filteredIssues[0] || null;
+  const activeSplitIssue = useMemo(() => {
+    if (!splitIssueId) return filteredIssues[0] || null;
+    return (
+      filteredIssues.find((i) => i.id === splitIssueId) ||
+      filteredIssues[0] ||
+      null
+    );
+  }, [filteredIssues, splitIssueId]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Top Header */}
-      <div className="px-6 py-4 bg-white border-b border-slate-200">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
+    <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+      {/* Header */}
+      <div className="px-6 py-4 bg-white border-b border-slate-200 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-              <span>Projects</span>
-              <span>/</span>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
               <span>{project.name}</span>
               <span>/</span>
-              <span className="font-mono tabular-nums text-slate-700">Issue Navigator & JQL Search</span>
+              <span className="font-semibold text-slate-700">
+                Issue Navigator & Advanced JQL Search
+              </span>
             </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Issues & Filters
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight mt-0.5">
+              Search & Filter Issues
             </h1>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            {/* Switch Basic / JQL */}
-            <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200 rounded-md">
-              <button
-                type="button"
-                onClick={() => setQueryMode('BASIC')}
-                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  queryMode === 'BASIC'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Basic Filters
-              </button>
-              <button
-                type="button"
-                onClick={() => setQueryMode('JQL')}
-                className={`px-3 py-1 text-xs font-medium rounded flex items-center gap-1 transition-colors ${
-                  queryMode === 'JQL'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Code2 className="w-3.5 h-3.5" />
-                JQL
-              </button>
-            </div>
+          {/* Right Controls: Saved Filters, Mode Switch, Layout Toggle, Export CSV */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSavingFilter(!savingFilter)}
+              className="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 flex items-center gap-1.5"
+            >
+              <Bookmark className="w-3.5 h-3.5 text-blue-600" />
+              Save Filter
+            </button>
 
-            {/* Switch Table / Split View */}
-            <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200 rounded-md">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export CSV
+            </button>
+
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
               <button
                 type="button"
                 onClick={() => setViewLayout('TABLE')}
-                className={`px-2.5 py-1 text-xs font-medium rounded flex items-center gap-1 transition-colors ${
+                className={`px-2.5 py-1 text-xs font-semibold rounded flex items-center gap-1 ${
                   viewLayout === 'TABLE'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
-                title="List Table View"
               >
                 <LayoutList className="w-3.5 h-3.5" />
                 List
@@ -361,100 +336,107 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
               <button
                 type="button"
                 onClick={() => setViewLayout('SPLIT')}
-                className={`px-2.5 py-1 text-xs font-medium rounded flex items-center gap-1 transition-colors ${
+                className={`px-2.5 py-1 text-xs font-semibold rounded flex items-center gap-1 ${
                   viewLayout === 'SPLIT'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
-                title="Detail Split View"
               >
                 <PanelRight className="w-3.5 h-3.5" />
-                Split
+                Detail View
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 flex items-center gap-1.5 transition-colors whitespace-nowrap"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export CSV
-            </button>
           </div>
         </div>
 
-        {/* Saved Filters Preset Bar */}
-        <div className="flex flex-wrap items-center gap-1.5 pb-3 mb-3 border-b border-slate-100">
-          <span className="text-xs text-slate-500 mr-1 flex items-center gap-1">
-            <Bookmark className="w-3.5 h-3.5" />
-            Saved Filters:
-          </span>
-          {savedFilters.map((flt) => (
-            <button
-              key={flt.id}
-              type="button"
-              onClick={() => applySavedFilter(flt)}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                activeFilterId === flt.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {flt.name}
-            </button>
-          ))}
-
-          {savingFilter ? (
-            <form onSubmit={handleSaveCustomFilter} className="flex items-center gap-1.5 ml-2">
-              <input
-                type="text"
-                autoFocus
-                value={newFilterName}
-                onChange={(e) => setNewFilterName(e.target.value)}
-                placeholder="Filter name..."
-                className="px-2 py-1 text-xs border border-blue-600 rounded focus:outline-none"
-              />
+        {/* Saved Filter Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mr-1">
+              Saved Filters:
+            </span>
+            {savedFilters.map((flt) => (
               <button
-                type="submit"
-                className="px-2 py-1 text-xs font-semibold bg-blue-600 text-white rounded"
-              >
-                Save
-              </button>
-              <button
+                key={flt.id}
                 type="button"
-                onClick={() => setSavingFilter(false)}
-                className="text-xs text-slate-500 px-1"
+                onClick={() => applySavedFilter(flt)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                  activeFilterId === flt.id
+                    ? 'bg-blue-50 border-blue-600 text-blue-700 font-semibold'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
               >
-                Cancel
+                {flt.name}
               </button>
-            </form>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSavingFilter(true)}
-              className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors whitespace-nowrap"
-            >
-              + Save Current Filter
-            </button>
-          )}
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              setQueryMode(queryMode === 'BASIC' ? 'JQL' : 'BASIC')
+            }
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+          >
+            {queryMode === 'BASIC' ? (
+              <>
+                <Code2 className="w-3.5 h-3.5" />
+                Switch to JQL
+              </>
+            ) : (
+              <>
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                Switch to Basic Filters
+              </>
+            )}
+          </button>
         </div>
 
-        {/* Filter Controls or JQL Bar */}
+        {/* Save Filter Inline Drawer */}
+        {savingFilter && (
+          <form
+            onSubmit={handleSaveCurrentFilter}
+            className="flex items-center gap-2 p-2.5 bg-blue-50/60 border border-blue-200 rounded-md"
+          >
+            <input
+              type="text"
+              autoFocus
+              value={newFilterName}
+              onChange={(e) => setNewFilterName(e.target.value)}
+              placeholder="Name this filter (e.g. Sprint 21 Blockers)..."
+              className="flex-1 text-xs bg-white border border-slate-300 rounded px-3 py-1.5 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setSavingFilter(false)}
+              className="p-1.5 text-slate-500"
+            >
+              Cancel
+            </button>
+          </form>
+        )}
+
+        {/* Query Bar: Either Basic Selectors OR JQL Input */}
         {queryMode === 'JQL' ? (
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded border border-blue-200">
+            <div className="px-2.5 py-1.5 bg-slate-900 text-emerald-400 font-mono text-xs font-bold rounded-l-md">
               JQL
-            </span>
+            </div>
             <input
               type="text"
               value={jqlString}
               onChange={(e) => setJqlString(e.target.value)}
-              placeholder='e.g. type = BUG AND status != DONE ORDER BY priority DESC'
-              className="flex-1 font-mono text-xs px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-md text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white"
+              placeholder='assignee = currentUser() AND status != DONE AND priority IN (HIGHEST, HIGH) ORDER BY priority DESC'
+              className="flex-1 font-mono text-xs bg-slate-900 text-slate-100 px-3 py-1.5 rounded-r-md focus:outline-none"
             />
-            <span className="text-xs text-slate-500 font-mono tabular-nums shrink-0">
-              {filteredIssues.length} matching issues
+            <span className="text-xs text-slate-500 font-mono">
+              {filteredIssues.length} matches
             </span>
           </div>
         ) : (
@@ -621,7 +603,7 @@ export const IssuesNavigatorView: React.FC<IssuesNavigatorViewProps> = ({
                             value={iss.status}
                             onChange={(e) =>
                               onUpdateIssue(iss.id, {
-                                status: e.target.value as IssueStatus,
+                                status: e.target.value,
                               })
                             }
                             aria-label="Change status"

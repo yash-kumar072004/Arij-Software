@@ -13,64 +13,46 @@ import {
   RotateCcw,
   Search,
   Settings,
+  UserCheck,
   Users,
   X,
 } from 'lucide-react';
 import {
-  AuditHistoryItem,
-  Issue,
   IssuePriority,
   IssueStatus,
   IssueType,
-  JiraWorkspaceState,
   NavigationTab,
-  Project,
-  ProjectComponent,
-  ReleaseVersion,
-  SavedFilter,
-  Sprint,
   SprintStatus,
-  User,
-} from './types/jira';
-import { INITIAL_WORKSPACE_STATE } from './data/initialWorkspace';
-import { IssueTypeIcon, UserAvatar } from './components/JiraPrimitives';
-import { BoardView } from './components/BoardView';
-import { BacklogView } from './components/BacklogView';
-import { TimelineView } from './components/TimelineView';
-import { IssuesNavigatorView } from './components/IssuesNavigatorView';
-import { ReportsView } from './components/ReportsView';
-import { ReleasesAndComponentsView } from './components/ReleasesAndComponentsView';
-import { ProjectSettingsView } from './components/ProjectSettingsView';
+} from './types/jira.js';
+import {
+  createPersonalWorkspaceBundle,
+  INITIAL_WORKSPACE_STATE,
+} from './data/initialWorkspace.js';
+import { IssueTypeIcon, UserAvatar } from './components/JiraPrimitives.jsx';
+import { BoardView } from './components/BoardView.jsx';
+import { BacklogView } from './components/BacklogView.jsx';
+import { TimelineView } from './components/TimelineView.jsx';
+import { IssuesNavigatorView } from './components/IssuesNavigatorView.jsx';
+import { ReportsView } from './components/ReportsView.jsx';
+import { ReleasesAndComponentsView } from './components/ReleasesAndComponentsView.jsx';
+import { ProjectSettingsView } from './components/ProjectSettingsView.jsx';
+import { MyWorkspaceView } from './components/MyWorkspaceView.jsx';
 import {
   CompleteSprintModal,
   CreateIssueModal,
   CreateProjectModal,
   StartSprintModal,
-} from './components/ActionModals';
-import { IssueDetailModal } from './components/IssueDetailModal';
-import {
-  ExtractedJiraPayload,
-  ScreenshotImporterModal,
-} from './components/ScreenshotImporterModal';
-import { GitHubPushModal } from './components/GitHubPushModal';
+} from './components/ActionModals.jsx';
+import { IssueDetailModal } from './components/IssueDetailModal.jsx';
+import { ScreenshotImporterModal } from './components/ScreenshotImporterModal.jsx';
+import { GitHubPushModal } from './components/GitHubPushModal.jsx';
 
-const STORAGE_KEY = 'jira_enterprise_workspace_v1';
-const CLIENT_ID_KEY = 'jira_system_client_id_v1';
-const SESSION_USER_KEY = 'jira_session_user_id_v1';
-const SESSION_PROJECT_KEY = 'jira_session_project_id_v1';
+const STORAGE_KEY = 'arij_enterprise_workspace_js_v2';
+const CLIENT_ID_KEY = 'arij_system_client_id_v2';
+const SESSION_USER_KEY = 'arij_session_user_id_v2';
+const SESSION_PROJECT_KEY = 'arij_session_project_id_v2';
 
-interface CollaboratorPresence {
-  clientId: string;
-  userId: string;
-  connectedAt: string;
-}
-
-interface WorkspaceMutationEvent {
-  type: string;
-  payload: Record<string, unknown>;
-}
-
-function getOrCreateClientId(): string {
+function getOrCreateClientId() {
   try {
     const existing = sessionStorage.getItem(CLIENT_ID_KEY);
     if (existing) return existing;
@@ -82,26 +64,71 @@ function getOrCreateClientId(): string {
   }
 }
 
-export default function App() {
-  const clientIdRef = useRef<string>(getOrCreateClientId());
-  const pendingEventsRef = useRef<WorkspaceMutationEvent[]>([]);
-  const revisionRef = useRef<number>(0);
+/**
+ * Ensures every user in the workspace has a dedicated personal project and sprint.
+ */
+function ensurePersonalWorkspacesForAllUsers(ws) {
+  let updated = false;
+  const nextProjects = [...(ws.projects || [])];
+  const nextSprints = [...(ws.sprints || [])];
+  const nextIssues = [...(ws.issues || [])];
+  const nextTodos = { ...(ws.personalTodosByUser || {}) };
 
-  const [workspace, setWorkspace] = useState<JiraWorkspaceState>(() => {
+  (ws.users || []).forEach((u) => {
+    const hasPersonalProj = nextProjects.some(
+      (p) => p.ownerUserId === u.id || p.id === `prj-personal-${u.id}`
+    );
+    if (!hasPersonalProj) {
+      const bundle = createPersonalWorkspaceBundle(u);
+      nextProjects.push(bundle.project);
+      nextSprints.push(bundle.sprint);
+      nextIssues.push(...bundle.issues);
+      updated = true;
+    }
+    if (!nextTodos[u.id]) {
+      nextTodos[u.id] = [
+        {
+          id: `todo-init-${u.id}`,
+          text: `Review ${u.name}'s sprint tasks and board priorities`,
+          done: false,
+        },
+      ];
+      updated = true;
+    }
+  });
+
+  if (!updated) return ws;
+  return {
+    ...ws,
+    projects: nextProjects,
+    sprints: nextSprints,
+    issues: nextIssues,
+    personalTodosByUser: nextTodos,
+  };
+}
+
+export default function App() {
+  const clientIdRef = useRef(getOrCreateClientId());
+  const pendingEventsRef = useRef([]);
+  const revisionRef = useRef(0);
+
+  // Per-user isolation filter: 'ALL' (Shared + Personal) or 'MY_OWN' (Strictly current user's own workspace & tasks)
+  const [workspaceScopeMode, setWorkspaceScopeMode] = useState('ALL');
+
+  const [workspace, setWorkspace] = useState(() => {
     let baseState = INITIAL_WORKSPACE_STATE;
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed.projects) && Array.isArray(parsed.issues)) {
-          baseState = parsed;
+          baseState = ensurePersonalWorkspacesForAllUsers(parsed);
         }
       }
     } catch {
       // Fallback to initial state
     }
 
-    // Per-system session user & active project isolation
     try {
       const sessionUser = sessionStorage.getItem(SESSION_USER_KEY);
       const sessionProject = sessionStorage.getItem(SESSION_PROJECT_KEY);
@@ -121,7 +148,7 @@ export default function App() {
     }
   });
 
-  const [collaborators, setCollaborators] = useState<CollaboratorPresence[]>([]);
+  const [collaborators, setCollaborators] = useState([]);
 
   useEffect(() => {
     try {
@@ -133,43 +160,44 @@ export default function App() {
     }
   }, [workspace]);
 
-  const reconcileServerState = useCallback(
-    (incomingWorkspace: JiraWorkspaceState, incomingRevision?: number) => {
-      if (
-        typeof incomingRevision === 'number' &&
-        incomingRevision < revisionRef.current
-      ) {
-        return;
-      }
-      if (typeof incomingRevision === 'number') {
-        revisionRef.current = incomingRevision;
-      }
+  const reconcileServerState = useCallback((incomingWorkspace, incomingRevision) => {
+    if (
+      typeof incomingRevision === 'number' &&
+      incomingRevision < revisionRef.current
+    ) {
+      return;
+    }
+    if (typeof incomingRevision === 'number') {
+      revisionRef.current = incomingRevision;
+    }
 
-      setWorkspace((prev) => {
-        const keepUserId = incomingWorkspace.users.some(
-          (u) => u.id === prev.currentUserId
-        )
-          ? prev.currentUserId
-          : incomingWorkspace.currentUserId;
+    const hydrated = ensurePersonalWorkspacesForAllUsers(incomingWorkspace);
 
-        const keepProjectId = incomingWorkspace.projects.some(
-          (p) => p.id === prev.activeProjectId
-        )
-          ? prev.activeProjectId
-          : incomingWorkspace.activeProjectId;
+    setWorkspace((prev) => {
+      const keepUserId = hydrated.users.some((u) => u.id === prev.currentUserId)
+        ? prev.currentUserId
+        : hydrated.currentUserId;
 
-        return {
-          ...incomingWorkspace,
-          currentUserId: keepUserId,
-          activeProjectId: keepProjectId,
-        };
-      });
-    },
-    []
-  );
+      const keepProjectId = hydrated.projects.some(
+        (p) => p.id === prev.activeProjectId
+      )
+        ? prev.activeProjectId
+        : hydrated.activeProjectId;
+
+      return {
+        ...hydrated,
+        personalTodosByUser: {
+          ...(hydrated.personalTodosByUser || {}),
+          ...(prev.personalTodosByUser || {}),
+        },
+        currentUserId: keepUserId,
+        activeProjectId: keepProjectId,
+      };
+    });
+  }, []);
 
   const dispatchWorkspaceEvent = useCallback(
-    async (event: WorkspaceMutationEvent | WorkspaceMutationEvent[]) => {
+    async (event) => {
       const eventsArray = Array.isArray(event) ? event : [event];
       try {
         const res = await fetch('/api/workspace/events', {
@@ -188,7 +216,6 @@ export default function App() {
           reconcileServerState(data.workspace, data.revision);
         }
       } catch {
-        // Queue events for automatic replay upon reconnection
         pendingEventsRef.current.push(...eventsArray);
       }
     },
@@ -197,8 +224,8 @@ export default function App() {
 
   // Connect to real-time multi-system SSE stream + auto-reconnect
   useEffect(() => {
-    let es: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let es = null;
+    let reconnectTimer = null;
     let isMounted = true;
 
     const connectStream = () => {
@@ -209,7 +236,7 @@ export default function App() {
 
       es = new EventSource(url);
 
-      es.addEventListener('workspace:init', (e: MessageEvent) => {
+      es.addEventListener('workspace:init', (e) => {
         try {
           const data = JSON.parse(e.data);
           if (data.workspace) {
@@ -218,7 +245,6 @@ export default function App() {
           if (Array.isArray(data.collaborators)) {
             setCollaborators(data.collaborators);
           }
-          // Flush any pending offline mutations
           if (pendingEventsRef.current.length > 0) {
             const queued = [...pendingEventsRef.current];
             pendingEventsRef.current = [];
@@ -229,7 +255,7 @@ export default function App() {
         }
       });
 
-      es.addEventListener('workspace:sync', (e: MessageEvent) => {
+      es.addEventListener('workspace:sync', (e) => {
         try {
           const data = JSON.parse(e.data);
           if (data.workspace) {
@@ -243,7 +269,7 @@ export default function App() {
         }
       });
 
-      es.addEventListener('presence:updated', (e: MessageEvent) => {
+      es.addEventListener('presence:updated', (e) => {
         try {
           const data = JSON.parse(e.data);
           if (Array.isArray(data.collaborators)) {
@@ -283,28 +309,21 @@ export default function App() {
     }).catch(() => {});
   }, [workspace.currentUserId]);
 
-  const [activeTab, setActiveTab] = useState<NavigationTab>(NavigationTab.BOARD);
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState(NavigationTab.BOARD);
+  const [selectedIssueId, setSelectedIssueId] = useState(null);
 
   // Modals state
   const [showCreateIssueModal, setShowCreateIssueModal] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showScreenshotImporter, setShowScreenshotImporter] = useState(false);
   const [showGitHubModal, setShowGitHubModal] = useState(false);
-  const [sprintToStart, setSprintToStart] = useState<Sprint | null>(null);
+  const [sprintToStart, setSprintToStart] = useState(null);
   const [showCompleteSprintModal, setShowCompleteSprintModal] = useState(false);
-  const [importBanner, setImportBanner] = useState<string | null>(null);
+  const [importBanner, setImportBanner] = useState(null);
 
   // Global Quick Search
   const [globalSearch, setGlobalSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-
-  const activeProject = useMemo(() => {
-    return (
-      workspace.projects.find((p) => p.id === workspace.activeProjectId) ||
-      workspace.projects[0]
-    );
-  }, [workspace.projects, workspace.activeProjectId]);
 
   const currentUser = useMemo(() => {
     return (
@@ -313,9 +332,58 @@ export default function App() {
     );
   }, [workspace.users, workspace.currentUserId]);
 
+  // Visible projects: when in 'MY_OWN' mode, show only current user's personal or lead projects;
+  // in 'ALL' mode, show shared projects + current user's own personal projects (hiding other users' private personal spaces!)
+  const visibleProjects = useMemo(() => {
+    if (workspaceScopeMode === 'MY_OWN') {
+      const own = workspace.projects.filter(
+        (p) => p.ownerUserId === currentUser.id || p.id === `prj-personal-${currentUser.id}`
+      );
+      return own.length > 0 ? own : workspace.projects;
+    }
+    return workspace.projects.filter(
+      (p) => !p.isPersonal || p.ownerUserId === currentUser.id
+    );
+  }, [workspace.projects, workspaceScopeMode, currentUser.id]);
+
+  const activeProject = useMemo(() => {
+    return (
+      visibleProjects.find((p) => p.id === workspace.activeProjectId) ||
+      visibleProjects[0] ||
+      workspace.projects[0]
+    );
+  }, [visibleProjects, workspace.activeProjectId, workspace.projects]);
+
+  // Switch active user and optionally jump to their own personal project if in MY_OWN mode
+  const handleSwitchUser = (userId) => {
+    setWorkspace((prev) => {
+      const personalProj = prev.projects.find(
+        (p) => p.ownerUserId === userId || p.id === `prj-personal-${userId}`
+      );
+      const currentProj = prev.projects.find((p) => p.id === prev.activeProjectId);
+      const shouldSwitchProj =
+        workspaceScopeMode === 'MY_OWN' || (currentProj && currentProj.isPersonal);
+
+      return {
+        ...prev,
+        currentUserId: userId,
+        activeProjectId:
+          shouldSwitchProj && personalProj
+            ? personalProj.id
+            : prev.activeProjectId,
+      };
+    });
+  };
+
   const projectIssues = useMemo(() => {
-    return workspace.issues.filter((i) => i.projectId === activeProject.id);
-  }, [workspace.issues, activeProject.id]);
+    const base = workspace.issues.filter((i) => i.projectId === activeProject.id);
+    if (workspaceScopeMode === 'MY_OWN' && !activeProject.isPersonal) {
+      return base.filter(
+        (i) => i.type === IssueType.EPIC || i.assigneeId === currentUser.id
+      );
+    }
+    return base;
+  }, [workspace.issues, activeProject, workspaceScopeMode, currentUser.id]);
 
   const projectEpics = useMemo(() => {
     return projectIssues.filter((i) => i.type === IssueType.EPIC);
@@ -357,16 +425,16 @@ export default function App() {
       .slice(0, 8);
   }, [workspace.issues, globalSearch]);
 
-  // Core Mutation Handlers (Optimistic UI + Server-Authoritative Event Dispatch)
-  const handleUpdateIssue = (issueId: string, updates: Partial<Issue>) => {
+  // Core Mutation Handlers
+  const handleUpdateIssue = (issueId, updates) => {
     const now = new Date().toISOString();
     setWorkspace((prev) => ({
       ...prev,
       issues: prev.issues.map((iss) => {
         if (iss.id !== issueId) return iss;
 
-        const newHistory: AuditHistoryItem[] = [...iss.history];
-        const trackedFields: (keyof Issue)[] = [
+        const newHistory = [...iss.history];
+        const trackedFields = [
           'status',
           'priority',
           'assigneeId',
@@ -406,17 +474,11 @@ export default function App() {
     });
   };
 
-  const handleQuickCreateIssue = (payload: {
-    title: string;
-    type: IssueType;
-    status: IssueStatus;
-    sprintId: string | null;
-    epicId: string | null;
-  }) => {
+  const handleQuickCreateIssue = (payload) => {
     const now = new Date().toISOString();
     const nextNumber = activeProject.issueCounter + 1;
     const newKey = `${activeProject.key}-${nextNumber}`;
-    const newIssue: Issue = {
+    const newIssue = {
       id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       projectId: activeProject.id,
       key: newKey,
@@ -425,7 +487,10 @@ export default function App() {
       type: payload.type,
       status: payload.status,
       priority: IssuePriority.MEDIUM,
-      assigneeId: activeProject.defaultAssigneeId || workspace.currentUserId,
+      assigneeId:
+        workspaceScopeMode === 'MY_OWN'
+          ? workspace.currentUserId
+          : activeProject.defaultAssigneeId || workspace.currentUserId,
       reporterId: workspace.currentUserId,
       epicId: payload.epicId,
       sprintId: payload.sprintId,
@@ -468,30 +533,79 @@ export default function App() {
     });
   };
 
-  const handleFullCreateIssue = (payload: {
-    projectId: string;
-    title: string;
-    description: string;
-    type: IssueType;
-    status: IssueStatus;
-    priority: IssuePriority;
-    assigneeId: string | null;
-    epicId: string | null;
-    sprintId: string | null;
-    storyPoints: number;
-    originalEstimateHours: number;
-    componentId: string | null;
-    fixVersionId: string | null;
-    dueDate: string;
-    labels: string[];
-  }) => {
+  const handleQuickCreatePersonalIssue = (payload) => {
+    const personalProj =
+      workspace.projects.find(
+        (p) =>
+          p.ownerUserId === currentUser.id ||
+          p.id === `prj-personal-${currentUser.id}`
+      ) || activeProject;
+    const personalSprint = workspace.sprints.find(
+      (s) => s.projectId === personalProj.id && s.status === SprintStatus.ACTIVE
+    );
+
+    const now = new Date().toISOString();
+    const nextNumber = personalProj.issueCounter + 1;
+    const newKey = `${personalProj.key}-${nextNumber}`;
+    const newIssue = {
+      id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      projectId: personalProj.id,
+      key: newKey,
+      title: payload.title,
+      description: `Created in ${currentUser.name}'s Personal Workspace.`,
+      type: payload.type,
+      status: payload.status,
+      priority: IssuePriority.MEDIUM,
+      assigneeId: currentUser.id,
+      reporterId: currentUser.id,
+      epicId: null,
+      sprintId: personalSprint ? personalSprint.id : null,
+      storyPoints: 3,
+      originalEstimateHours: 6,
+      timeSpentHours: 0,
+      remainingEstimateHours: 6,
+      labels: ['personal'],
+      componentId: null,
+      fixVersionId: null,
+      startDate: now.slice(0, 10),
+      dueDate: '2026-10-18',
+      subtasks: [],
+      links: [],
+      comments: [],
+      workLogs: [],
+      history: [],
+      watcherIds: [currentUser.id],
+      createdAt: now,
+      updatedAt: now,
+      order: workspace.issues.length + 1,
+    };
+
+    setWorkspace((prev) => ({
+      ...prev,
+      projects: prev.projects.map((p) =>
+        p.id === personalProj.id ? { ...p, issueCounter: nextNumber } : p
+      ),
+      issues: [...prev.issues, newIssue],
+    }));
+
+    void dispatchWorkspaceEvent({
+      type: 'issue:created',
+      payload: {
+        issue: newIssue,
+        projectId: personalProj.id,
+        nextCounter: nextNumber,
+      },
+    });
+  };
+
+  const handleFullCreateIssue = (payload) => {
     const targetProject =
       workspace.projects.find((p) => p.id === payload.projectId) || activeProject;
     const nextNumber = targetProject.issueCounter + 1;
     const newKey = `${targetProject.key}-${nextNumber}`;
     const now = new Date().toISOString();
 
-    const newIssue: Issue = {
+    const newIssue = {
       id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       projectId: targetProject.id,
       key: newKey,
@@ -543,7 +657,7 @@ export default function App() {
     });
   };
 
-  const handleDeleteIssue = (issueId: string) => {
+  const handleDeleteIssue = (issueId) => {
     setWorkspace((prev) => ({
       ...prev,
       issues: prev.issues.filter((i) => i.id !== issueId),
@@ -555,11 +669,11 @@ export default function App() {
     });
   };
 
-  const handleCloneIssue = (source: Issue) => {
+  const handleCloneIssue = (source) => {
     const nextNumber = activeProject.issueCounter + 1;
     const newKey = `${activeProject.key}-${nextNumber}`;
     const now = new Date().toISOString();
-    const cloned: Issue = {
+    const cloned = {
       ...source,
       id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       key: newKey,
@@ -587,7 +701,7 @@ export default function App() {
     });
   };
 
-  const handleAddComment = (issueId: string, body: string) => {
+  const handleAddComment = (issueId, body) => {
     const now = new Date().toISOString();
     const comment = {
       id: `cmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -614,7 +728,7 @@ export default function App() {
     });
   };
 
-  const handleLogWork = (issueId: string, hours: number, comment: string) => {
+  const handleLogWork = (issueId, hours, comment) => {
     const now = new Date().toISOString();
     const workLog = {
       id: `wl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -648,7 +762,7 @@ export default function App() {
   // Sprint Handlers
   const handleCreateSprint = () => {
     const nextNum = projectSprints.length + 22;
-    const newSprint: Sprint = {
+    const newSprint = {
       id: `spr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       projectId: activeProject.id,
       name: `${activeProject.key} Sprint ${nextNum} — Planned Iteration`,
@@ -668,10 +782,7 @@ export default function App() {
     });
   };
 
-  const handleConfirmStartSprint = (
-    sprintId: string,
-    updates: { name: string; goal: string; startDate: string; endDate: string }
-  ) => {
+  const handleConfirmStartSprint = (sprintId, updates) => {
     setWorkspace((prev) => ({
       ...prev,
       sprints: prev.sprints.map((s) => {
@@ -701,10 +812,7 @@ export default function App() {
     });
   };
 
-  const handleConfirmCompleteSprint = (
-    sprintId: string,
-    destinationSprintId: string | null
-  ) => {
+  const handleConfirmCompleteSprint = (sprintId, destinationSprintId) => {
     const spIssues = projectIssues.filter(
       (i) => i.sprintId === sprintId && i.type !== IssueType.EPIC
     );
@@ -748,7 +856,7 @@ export default function App() {
     });
   };
 
-  const handleDeleteSprint = (sprintId: string) => {
+  const handleDeleteSprint = (sprintId) => {
     setWorkspace((prev) => ({
       ...prev,
       sprints: prev.sprints.filter((s) => s.id !== sprintId),
@@ -764,12 +872,8 @@ export default function App() {
   };
 
   // Releases & Components Handlers
-  const handleCreateRelease = (payload: {
-    name: string;
-    description: string;
-    releaseDate: string;
-  }) => {
-    const release: ReleaseVersion = {
+  const handleCreateRelease = (payload) => {
+    const release = {
       id: `rel-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       projectId: activeProject.id,
       name: payload.name,
@@ -789,7 +893,7 @@ export default function App() {
     });
   };
 
-  const handleToggleReleaseStatus = (releaseId: string) => {
+  const handleToggleReleaseStatus = (releaseId) => {
     setWorkspace((prev) => ({
       ...prev,
       releases: prev.releases.map((r) =>
@@ -808,12 +912,8 @@ export default function App() {
     });
   };
 
-  const handleCreateComponent = (payload: {
-    name: string;
-    description: string;
-    leadId: string;
-  }) => {
-    const component: ProjectComponent = {
+  const handleCreateComponent = (payload) => {
+    const component = {
       id: `cmp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       projectId: activeProject.id,
       name: payload.name,
@@ -831,8 +931,7 @@ export default function App() {
     });
   };
 
-  // Project & Team Handlers
-  const handleUpdateProject = (updates: Partial<Project>) => {
+  const handleUpdateProject = (updates) => {
     setWorkspace((prev) => ({
       ...prev,
       projects: prev.projects.map((p) =>
@@ -846,17 +945,10 @@ export default function App() {
     });
   };
 
-  const handleCreateProject = (payload: {
-    name: string;
-    key: string;
-    description: string;
-    category: Project['category'];
-    template: Project['template'];
-    leadId: string;
-  }) => {
+  const handleCreateProject = (payload) => {
     const newProjId = `prj-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
     const newSprintId = `spr-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
-    const newProj: Project = {
+    const newProj = {
       id: newProjId,
       key: payload.key,
       name: payload.name,
@@ -865,6 +957,8 @@ export default function App() {
       template: payload.template,
       leadId: payload.leadId,
       defaultAssigneeId: payload.leadId,
+      isPersonal: Boolean(payload.isPersonal),
+      ownerUserId: payload.ownerUserId || null,
       issueCounter: 101,
       wipLimits: {
         [IssueStatus.TODO]: 0,
@@ -876,7 +970,7 @@ export default function App() {
       createdAt: new Date().toISOString(),
     };
 
-    const initialSprint: Sprint = {
+    const initialSprint = {
       id: newSprintId,
       projectId: newProjId,
       name: `${payload.key} Sprint 1 — Initial Launch`,
@@ -886,12 +980,13 @@ export default function App() {
       endDate: '2026-10-19',
     };
 
-    const starterIssue: Issue = {
+    const starterIssue = {
       id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       projectId: newProjId,
       key: `${payload.key}-101`,
       title: `Set up foundational architecture and CI/CD pipeline for ${payload.name}`,
-      description: 'Initialize repository structure, automated test runner, and deployment workflows.',
+      description:
+        'Initialize repository structure, automated test runner, and deployment workflows.',
       type: IssueType.STORY,
       status: IssueStatus.IN_PROGRESS,
       priority: IssuePriority.HIGH,
@@ -938,19 +1033,15 @@ export default function App() {
     });
   };
 
-  const handleAddUser = (payload: {
-    name: string;
-    email: string;
-    role: string;
-    department: string;
-  }) => {
+  // Create a new user AND automatically create their dedicated personal project & tasks
+  const handleAddUser = (payload, switchToNewUser = false) => {
     const initials = payload.name
       .split(/\s+/)
       .map((w) => w[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
-    const user: User = {
+    const user = {
       id: `usr-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       name: payload.name,
       email: payload.email,
@@ -959,19 +1050,95 @@ export default function App() {
       avatarUrl: '',
       initials,
     };
+
+    const bundle = createPersonalWorkspaceBundle(user);
+
     setWorkspace((prev) => ({
       ...prev,
+      currentUserId: switchToNewUser ? user.id : prev.currentUserId,
+      activeProjectId: switchToNewUser ? bundle.project.id : prev.activeProjectId,
       users: [...prev.users, user],
+      projects: [...prev.projects, bundle.project],
+      sprints: [...prev.sprints, bundle.sprint],
+      issues: [...prev.issues, ...bundle.issues],
+      personalTodosByUser: {
+        ...(prev.personalTodosByUser || {}),
+        [user.id]: [
+          {
+            id: `todo-${Date.now()}`,
+            text: `Welcome ${user.name}! Track your personal tasks here.`,
+            done: false,
+          },
+        ],
+      },
     }));
 
-    void dispatchWorkspaceEvent({
-      type: 'user:created',
-      payload: { user },
+    void dispatchWorkspaceEvent([
+      {
+        type: 'user:created',
+        payload: { user },
+      },
+      {
+        type: 'project:created',
+        payload: {
+          project: bundle.project,
+          initialSprint: bundle.sprint,
+          starterIssue: bundle.issues[0],
+        },
+      },
+    ]);
+  };
+
+  // Personal Private Scratchpad Handlers (Per-User)
+  const handleAddPersonalTodo = (text) => {
+    setWorkspace((prev) => {
+      const uid = prev.currentUserId;
+      const list = prev.personalTodosByUser?.[uid] || [];
+      return {
+        ...prev,
+        personalTodosByUser: {
+          ...(prev.personalTodosByUser || {}),
+          [uid]: [
+            ...list,
+            { id: `todo-${Date.now()}`, text, done: false },
+          ],
+        },
+      };
     });
   };
 
-  const handleSaveFilter = (name: string, jql: string) => {
-    const filter: SavedFilter = {
+  const handleTogglePersonalTodo = (todoId) => {
+    setWorkspace((prev) => {
+      const uid = prev.currentUserId;
+      const list = prev.personalTodosByUser?.[uid] || [];
+      return {
+        ...prev,
+        personalTodosByUser: {
+          ...(prev.personalTodosByUser || {}),
+          [uid]: list.map((t) =>
+            t.id === todoId ? { ...t, done: !t.done } : t
+          ),
+        },
+      };
+    });
+  };
+
+  const handleDeletePersonalTodo = (todoId) => {
+    setWorkspace((prev) => {
+      const uid = prev.currentUserId;
+      const list = prev.personalTodosByUser?.[uid] || [];
+      return {
+        ...prev,
+        personalTodosByUser: {
+          ...(prev.personalTodosByUser || {}),
+          [uid]: list.filter((t) => t.id !== todoId),
+        },
+      };
+    });
+  };
+
+  const handleSaveFilter = (name, jql) => {
+    const filter = {
       id: `flt-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       name,
       jql,
@@ -987,24 +1154,20 @@ export default function App() {
     });
   };
 
-  const handleApplyScreenshotImport = (
-    payload: ExtractedJiraPayload,
-    mode: 'MERGE_CURRENT' | 'CREATE_NEW_PROJECT'
-  ) => {
+  const handleApplyScreenshotImport = (payload, mode) => {
     const now = new Date().toISOString();
-
-    let syncedWorkspaceSnapshot: JiraWorkspaceState | null = null;
+    let syncedWorkspaceSnapshot = null;
 
     setWorkspace((prev) => {
-      const updatedUsers: User[] = [...prev.users];
+      const updatedUsers = [...prev.users];
 
       const resolveUserProfile = (
-        nameRaw?: string,
-        initialsRaw?: string,
-        roleRaw?: string,
-        emailRaw?: string,
-        deptRaw?: string
-      ): string | null => {
+        nameRaw,
+        initialsRaw,
+        roleRaw,
+        emailRaw,
+        deptRaw
+      ) => {
         const cleanName = (nameRaw || '').trim();
         const cleanInit = (initialsRaw || '').trim().toUpperCase();
         if (!cleanName && !cleanInit) return null;
@@ -1028,7 +1191,7 @@ export default function App() {
           'TM';
 
         const displayName = cleanName || `Engineer (${computedInitials})`;
-        const newUser: User = {
+        const newUser = {
           id: `usr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: displayName,
           initials: computedInitials,
@@ -1066,7 +1229,8 @@ export default function App() {
           id: targetProjectId,
           key: targetProjectKey,
           name: payload.projectName || `${targetProjectKey} Imported Project`,
-          description: 'Imported directly from board screenshot with replicated profiles and task assignments.',
+          description:
+            'Imported directly from board screenshot with replicated profiles and task assignments.',
           category: 'Software Engineering',
           template: 'Scrum',
           leadId: updatedUsers[0]?.id || prev.currentUserId,
@@ -1086,7 +1250,9 @@ export default function App() {
           id: newSprintId,
           projectId: targetProjectId,
           name: payload.sprintName || `${targetProjectKey} Active Sprint (Imported)`,
-          goal: payload.sprintGoal || 'Replicated sprint tasks and assignments from board screenshot.',
+          goal:
+            payload.sprintGoal ||
+            'Replicated sprint tasks and assignments from board screenshot.',
           status: SprintStatus.ACTIVE,
           startDate: now.slice(0, 10),
           endDate: '2026-10-24',
@@ -1105,14 +1271,14 @@ export default function App() {
         });
       }
 
-      const epicTitleToId: Record<string, string> = {};
+      const epicTitleToId = {};
       prev.issues
         .filter((i) => i.projectId === targetProjectId && i.type === IssueType.EPIC)
         .forEach((ep) => {
           epicTitleToId[ep.title.toLowerCase()] = ep.id;
         });
 
-      const createdIssues: Issue[] = [];
+      const createdIssues = [];
       payload.epics.forEach((ep) => {
         if (!ep.title) return;
         const lower = ep.title.toLowerCase();
@@ -1161,7 +1327,7 @@ export default function App() {
           iss.assigneeInitials
         );
 
-        let linkedEpicId: string | null = null;
+        let linkedEpicId = null;
         if (iss.epicTitle) {
           const lowerEpic = iss.epicTitle.toLowerCase();
           if (!epicTitleToId[lowerEpic]) {
@@ -1225,7 +1391,8 @@ export default function App() {
           sprintId: iss.type === IssueType.EPIC ? null : targetSprintId,
           storyPoints: iss.storyPoints || 0,
           originalEstimateHours: (iss.storyPoints || 2) * 3,
-          timeSpentHours: iss.status === IssueStatus.DONE ? (iss.storyPoints || 2) * 3 : 0,
+          timeSpentHours:
+            iss.status === IssueStatus.DONE ? (iss.storyPoints || 2) * 3 : 0,
           remainingEstimateHours:
             iss.status === IssueStatus.DONE ? 0 : (iss.storyPoints || 2) * 3,
           labels:
@@ -1262,14 +1429,14 @@ export default function App() {
       );
       setTimeout(() => setImportBanner(null), 6000);
 
-      const nextWs: JiraWorkspaceState = {
+      const nextWs = ensurePersonalWorkspacesForAllUsers({
         ...prev,
         activeProjectId: targetProjectId,
         users: updatedUsers,
         projects: finalProjects,
         sprints: updatedSprints,
         issues: [...prev.issues, ...createdIssues],
-      };
+      });
       syncedWorkspaceSnapshot = nextWs;
       return nextWs;
     });
@@ -1285,7 +1452,7 @@ export default function App() {
   };
 
   const activeCollaboratorUsers = useMemo(() => {
-    const map = new Map<string, { user: User; count: number }>();
+    const map = new Map();
     collaborators.forEach((c) => {
       const usr =
         workspace.users.find((u) => u.id === c.userId) || workspace.users[0];
@@ -1302,6 +1469,13 @@ export default function App() {
 
   const openIssuesCount = projectIssues.filter(
     (i) => i.type !== IssueType.EPIC && i.status !== IssueStatus.DONE
+  ).length;
+
+  const myAssignedCount = workspace.issues.filter(
+    (i) =>
+      i.type !== IssueType.EPIC &&
+      i.assigneeId === currentUser.id &&
+      i.status !== IssueStatus.DONE
   ).length;
 
   return (
@@ -1324,6 +1498,17 @@ export default function App() {
         <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-300">
           <button
             type="button"
+            onClick={() => setActiveTab(NavigationTab.MY_SPACE)}
+            className={`py-1 transition-colors whitespace-nowrap shrink-0 ${
+              activeTab === NavigationTab.MY_SPACE
+                ? 'text-white underline underline-offset-8 decoration-2 decoration-blue-400 font-semibold'
+                : 'hover:text-white hover:underline underline-offset-8'
+            }`}
+          >
+            My Personal Space ({currentUser.initials})
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab(NavigationTab.BOARD)}
             className={`py-1 transition-colors whitespace-nowrap shrink-0 ${
               activeTab === NavigationTab.BOARD
@@ -1343,17 +1528,6 @@ export default function App() {
             }`}
           >
             Backlog
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab(NavigationTab.TIMELINE)}
-            className={`py-1 transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === NavigationTab.TIMELINE
-                ? 'text-white underline underline-offset-8 decoration-2 decoration-blue-400 font-semibold'
-                : 'hover:text-white hover:underline underline-offset-8'
-            }`}
-          >
-            Timeline
           </button>
           <button
             type="button"
@@ -1392,12 +1566,7 @@ export default function App() {
 
           <select
             value={workspace.currentUserId}
-            onChange={(e) =>
-              setWorkspace((prev) => ({
-                ...prev,
-                currentUserId: e.target.value,
-              }))
-            }
+            onChange={(e) => handleSwitchUser(e.target.value)}
             aria-label="Switch active user profile"
             className="text-xs font-medium bg-slate-800 text-slate-200 border border-slate-700 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
           >
@@ -1415,6 +1584,53 @@ export default function App() {
         {/* Left Project & Navigation Sidebar */}
         <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 overflow-y-auto">
           <div className="p-4 space-y-5">
+            {/* Per-User Workspace Scope Toggle ("Every User Has Their Own") */}
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                <span>Workspace Scope</span>
+                <span className="font-mono text-[10px] text-blue-700">
+                  {currentUser.name.split(' ')[0]}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1 bg-slate-200/70 p-0.5 rounded-md text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceScopeMode('MY_OWN');
+                    const personalProj = workspace.projects.find(
+                      (p) =>
+                        p.ownerUserId === currentUser.id ||
+                        p.id === `prj-personal-${currentUser.id}`
+                    );
+                    if (personalProj) {
+                      setWorkspace((prev) => ({
+                        ...prev,
+                        activeProjectId: personalProj.id,
+                      }));
+                    }
+                  }}
+                  className={`py-1.5 px-2 rounded font-semibold transition-all ${
+                    workspaceScopeMode === 'MY_OWN'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  My Own Only
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceScopeMode('ALL')}
+                  className={`py-1.5 px-2 rounded font-semibold transition-all ${
+                    workspaceScopeMode === 'ALL'
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All + Shared
+                </button>
+              </div>
+            </div>
+
             {/* Project Switcher */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1442,7 +1658,7 @@ export default function App() {
                 aria-label="Select project"
                 className="w-full px-3 py-2 text-xs font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-blue-600"
               >
-                {workspace.projects.map((p) => (
+                {visibleProjects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.key} — {p.name}
                   </option>
@@ -1452,7 +1668,9 @@ export default function App() {
               <div className="text-[11px] text-slate-500 flex items-center gap-1.5 px-1">
                 <span>{activeProject.template} Project</span>
                 <span>·</span>
-                <span className="truncate">{activeProject.category}</span>
+                <span className="truncate">
+                  {activeProject.isPersonal ? 'Personal Space' : activeProject.category}
+                </span>
               </div>
 
               {/* Prominent Screenshot Importer CTA */}
@@ -1498,7 +1716,6 @@ export default function App() {
                 </button>
               )}
 
-              {/* Instant Search Results Popover */}
               {searchFocused && globalSearchResults.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-40 divide-y divide-slate-100 max-h-64 overflow-y-auto">
                   {globalSearchResults.map((res) => (
@@ -1525,20 +1742,45 @@ export default function App() {
             {/* Planning & Development Navigation */}
             <div className="space-y-1">
               <div className="px-2 pb-1 text-[11px] font-semibold text-slate-400">
-                Planning & Execution
+                Personal & Project Views
               </div>
 
               <button
                 type="button"
-                onClick={() => setActiveTab(NavigationTab.TIMELINE)}
-                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2.5 transition-colors ${
-                  activeTab === NavigationTab.TIMELINE
+                onClick={() => setActiveTab(NavigationTab.MY_SPACE)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors ${
+                  activeTab === NavigationTab.MY_SPACE
                     ? 'bg-blue-50 text-blue-700 font-semibold'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                <Calendar className="w-4 h-4" />
-                Timeline Roadmap
+                <span className="flex items-center gap-2.5">
+                  <UserCheck className="w-4 h-4 text-blue-600" />
+                  My Personal Space
+                </span>
+                <span className="font-mono tabular-nums text-[11px] text-blue-600 font-bold">
+                  {myAssignedCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab(NavigationTab.BOARD)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors ${
+                  activeTab === NavigationTab.BOARD
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <Kanban className="w-4 h-4" />
+                  Active Sprint Board
+                </span>
+                <span className="font-mono tabular-nums text-[11px] text-slate-400">
+                  {activeSprint
+                    ? projectIssues.filter((i) => i.sprintId === activeSprint.id).length
+                    : projectIssues.length}
+                </span>
               </button>
 
               <button
@@ -1561,22 +1803,15 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab(NavigationTab.BOARD)}
-                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors ${
-                  activeTab === NavigationTab.BOARD
+                onClick={() => setActiveTab(NavigationTab.TIMELINE)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2.5 transition-colors ${
+                  activeTab === NavigationTab.TIMELINE
                     ? 'bg-blue-50 text-blue-700 font-semibold'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                <span className="flex items-center gap-2.5">
-                  <Kanban className="w-4 h-4" />
-                  Active Sprint Board
-                </span>
-                <span className="font-mono tabular-nums text-[11px] text-slate-400">
-                  {activeSprint
-                    ? projectIssues.filter((i) => i.sprintId === activeSprint.id).length
-                    : 0}
-                </span>
+                <Calendar className="w-4 h-4" />
+                Timeline Roadmap
               </button>
 
               <button
@@ -1719,6 +1954,35 @@ export default function App() {
             </div>
           )}
 
+          {activeTab === NavigationTab.MY_SPACE && (
+            <MyWorkspaceView
+              currentUser={currentUser}
+              users={workspace.users}
+              projects={workspace.projects}
+              allIssues={workspace.issues}
+              personalTodos={
+                workspace.personalTodosByUser?.[currentUser.id] || []
+              }
+              onSwitchUser={handleSwitchUser}
+              onSelectProject={(projId) => {
+                setWorkspace((prev) => ({
+                  ...prev,
+                  activeProjectId: projId,
+                }));
+                setActiveTab(NavigationTab.BOARD);
+              }}
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              onUpdateIssueStatus={(id, status) =>
+                handleUpdateIssue(id, { status })
+              }
+              onQuickCreatePersonalIssue={handleQuickCreatePersonalIssue}
+              onAddUserAccount={(u) => handleAddUser(u, true)}
+              onAddPersonalTodo={handleAddPersonalTodo}
+              onTogglePersonalTodo={handleTogglePersonalTodo}
+              onDeletePersonalTodo={handleDeletePersonalTodo}
+            />
+          )}
+
           {activeTab === NavigationTab.BOARD && (
             <BoardView
               project={activeProject}
@@ -1811,7 +2075,7 @@ export default function App() {
               project={activeProject}
               users={workspace.users}
               onUpdateProject={handleUpdateProject}
-              onAddUser={handleAddUser}
+              onAddUser={(u) => handleAddUser(u, false)}
             />
           )}
         </main>
@@ -1841,7 +2105,7 @@ export default function App() {
       {/* Create Issue Modal */}
       {showCreateIssueModal && (
         <CreateIssueModal
-          projects={workspace.projects}
+          projects={visibleProjects}
           activeProjectId={activeProject.id}
           epics={projectEpics}
           sprints={projectSprints}
@@ -1894,7 +2158,7 @@ export default function App() {
         />
       )}
 
-      {/* Screenshot-to-Jira Importer Modal */}
+      {/* Screenshot-to-Arij Importer Modal */}
       {showScreenshotImporter && (
         <ScreenshotImporterModal
           activeProject={activeProject}

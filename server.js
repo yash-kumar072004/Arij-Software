@@ -6,22 +6,15 @@ import { fileURLToPath } from 'url';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import dotenv from 'dotenv';
-import { GoogleGenAI, Type, GenerateContentResponse } from '@google/genai';
-import { INITIAL_WORKSPACE_STATE } from './src/data/initialWorkspace.ts';
+import { GoogleGenAI, Type } from '@google/genai';
 import {
-  AuditHistoryItem,
-  Issue,
+  createPersonalWorkspaceBundle,
+  INITIAL_WORKSPACE_STATE,
+} from './src/data/initialWorkspace.js';
+import {
   IssueStatus,
-  IssueType,
-  JiraWorkspaceState,
-  Project,
-  ProjectComponent,
-  ReleaseVersion,
-  SavedFilter,
-  Sprint,
   SprintStatus,
-  User,
-} from './src/types/jira.ts';
+} from './src/types/jira.js';
 
 dotenv.config();
 
@@ -40,9 +33,11 @@ app.use(express.json({ limit: '50mb' }));
 // CONCURRENCY & PARALLEL REQUEST MUTEX LOCK + SERVER-AUTHORITATIVE STATE
 // ============================================================================
 class AsyncMutex {
-  private queue: Promise<void> = Promise.resolve();
+  constructor() {
+    this.queue = Promise.resolve();
+  }
 
-  run<T>(task: () => Promise<T>): Promise<T> {
+  run(task) {
     const result = this.queue.then(() => task());
     this.queue = result.then(
       () => undefined,
@@ -53,18 +48,46 @@ class AsyncMutex {
 }
 
 const stateMutex = new AsyncMutex();
-let authoritativeWorkspace: JiraWorkspaceState = structuredClone(
-  INITIAL_WORKSPACE_STATE
-);
+let authoritativeWorkspace = structuredClone(INITIAL_WORKSPACE_STATE);
 let serverRevision = 1;
 
-async function loadDatabaseFromDisk(): Promise<void> {
+function ensureAllUsersHavePersonalWorkspace(ws) {
+  const nextProjects = [...(ws.projects || [])];
+  const nextSprints = [...(ws.sprints || [])];
+  const nextIssues = [...(ws.issues || [])];
+  let changed = false;
+
+  (ws.users || []).forEach((u) => {
+    const exists = nextProjects.some(
+      (p) => p.ownerUserId === u.id || p.id === `prj-personal-${u.id}`
+    );
+    if (!exists) {
+      const bundle = createPersonalWorkspaceBundle(u);
+      nextProjects.push(bundle.project);
+      nextSprints.push(bundle.sprint);
+      nextIssues.push(...bundle.issues);
+      changed = true;
+    }
+  });
+
+  if (!changed) return ws;
+  return {
+    ...ws,
+    projects: nextProjects,
+    sprints: nextSprints,
+    issues: nextIssues,
+  };
+}
+
+async function loadDatabaseFromDisk() {
   try {
     if (existsSync(DB_FILE_PATH)) {
       const raw = await fs.readFile(DB_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
       if (parsed && parsed.workspace && Array.isArray(parsed.workspace.projects)) {
-        authoritativeWorkspace = parsed.workspace;
+        authoritativeWorkspace = ensureAllUsersHavePersonalWorkspace(
+          parsed.workspace
+        );
         serverRevision =
           typeof parsed.revision === 'number' ? parsed.revision : 1;
       }
@@ -76,7 +99,7 @@ async function loadDatabaseFromDisk(): Promise<void> {
   }
 }
 
-async function persistDatabaseToDisk(): Promise<void> {
+async function persistDatabaseToDisk() {
   const tmpPath = `${DB_FILE_PATH}.${process.pid}.${Date.now()}.tmp`;
   const payload = JSON.stringify(
     {
@@ -94,17 +117,10 @@ async function persistDatabaseToDisk(): Promise<void> {
 // ============================================================================
 // REAL-TIME MULTI-SYSTEM SSE STREAMING & PRESENCE REGISTRY
 // ============================================================================
-interface ConnectedClient {
-  clientId: string;
-  userId: string;
-  connectedAt: string;
-  res: express.Response;
-}
-
-const connectedClients = new Map<string, ConnectedClient>();
+const connectedClients = new Map();
 
 function getActiveCollaborators() {
-  const list: { clientId: string; userId: string; connectedAt: string }[] = [];
+  const list = [];
   connectedClients.forEach((client) => {
     list.push({
       clientId: client.clientId,
@@ -115,7 +131,7 @@ function getActiveCollaborators() {
   return list;
 }
 
-function broadcastEvent(eventName: string, payload: unknown) {
+function broadcastEvent(eventName, payload) {
   const frame = `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
   connectedClients.forEach((client, id) => {
     try {
@@ -138,9 +154,9 @@ app.get('/api/workspace', (_req, res) => {
 // Real-time SSE stream for parallel connected systems
 app.get('/api/workspace/stream', (req, res) => {
   const clientId =
-    (req.query.clientId as string) ||
+    req.query.clientId ||
     `sys-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  const userId = (req.query.userId as string) || 'usr-1';
+  const userId = req.query.userId || 'usr-1';
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -155,7 +171,6 @@ app.get('/api/workspace/stream', (req, res) => {
     res,
   });
 
-  // Send immediate authoritative snapshot to the newly connected system
   res.write(
     `event: workspace:init\ndata: ${JSON.stringify({
       workspace: authoritativeWorkspace,
@@ -164,7 +179,6 @@ app.get('/api/workspace/stream', (req, res) => {
     })}\n\n`
   );
 
-  // Broadcast updated collaborator presence to all parallel systems
   broadcastEvent('presence:updated', {
     collaborators: getActiveCollaborators(),
   });
@@ -188,7 +202,7 @@ app.get('/api/workspace/stream', (req, res) => {
 
 // Update active user presence for a connected system
 app.post('/api/workspace/presence', (req, res) => {
-  const { clientId, userId } = req.body as { clientId: string; userId: string };
+  const { clientId, userId } = req.body || {};
   const client = connectedClients.get(clientId);
   if (client && userId) {
     client.userId = userId;
@@ -202,49 +216,19 @@ app.post('/api/workspace/presence', (req, res) => {
 // ============================================================================
 // IDEMPOTENT ATOMIC EVENT PROCESSOR FOR CONCURRENT REQUESTS
 // ============================================================================
-export interface WorkspaceMutationEvent {
-  type:
-    | 'issue:updated'
-    | 'issue:created'
-    | 'issue:deleted'
-    | 'issue:comment_added'
-    | 'issue:work_logged'
-    | 'sprint:created'
-    | 'sprint:started'
-    | 'sprint:completed'
-    | 'sprint:deleted'
-    | 'release:created'
-    | 'release:toggled'
-    | 'component:created'
-    | 'project:updated'
-    | 'project:created'
-    | 'user:created'
-    | 'filter:saved'
-    | 'workspace:imported'
-    | 'workspace:reset';
-  payload: Record<string, any>;
-}
-
-function applyMutationEvent(
-  ws: JiraWorkspaceState,
-  event: WorkspaceMutationEvent
-): JiraWorkspaceState {
+function applyMutationEvent(ws, event) {
   const now = new Date().toISOString();
   const { type, payload } = event;
 
   switch (type) {
     case 'issue:updated': {
-      const { issueId, updates, actorId } = payload as {
-        issueId: string;
-        updates: Partial<Issue>;
-        actorId: string;
-      };
+      const { issueId, updates, actorId } = payload;
       return {
         ...ws,
         issues: ws.issues.map((iss) => {
           if (iss.id !== issueId) return iss;
-          const newHistory: AuditHistoryItem[] = [...iss.history];
-          const trackedFields: (keyof Issue)[] = [
+          const newHistory = [...iss.history];
+          const trackedFields = [
             'status',
             'priority',
             'assigneeId',
@@ -275,26 +259,24 @@ function applyMutationEvent(
     }
 
     case 'issue:created': {
-      const { issue, projectId, nextCounter } = payload as {
-        issue: Issue;
-        projectId: string;
-        nextCounter: number;
-      };
-      // Idempotency guard: skip if issue ID already exists
+      const { issue, projectId, nextCounter } = payload;
       if (ws.issues.some((i) => i.id === issue.id)) {
         return ws;
       }
       const targetProj = ws.projects.find((p) => p.id === projectId);
-      let resolvedCounter = nextCounter || (targetProj ? targetProj.issueCounter + 1 : 101);
+      let resolvedCounter =
+        nextCounter || (targetProj ? targetProj.issueCounter + 1 : 101);
       let resolvedKey = issue.key;
 
-      // Resolve key collision if two parallel systems created an issue at the exact same time
       if (targetProj && ws.issues.some((i) => i.key === resolvedKey)) {
-        resolvedCounter = Math.max(targetProj.issueCounter + 1, resolvedCounter + 1);
+        resolvedCounter = Math.max(
+          targetProj.issueCounter + 1,
+          resolvedCounter + 1
+        );
         resolvedKey = `${targetProj.key}-${resolvedCounter}`;
       }
 
-      const finalIssue: Issue = {
+      const finalIssue = {
         ...issue,
         key: resolvedKey,
       };
@@ -303,7 +285,10 @@ function applyMutationEvent(
         ...ws,
         projects: ws.projects.map((p) =>
           p.id === projectId
-            ? { ...p, issueCounter: Math.max(p.issueCounter + 1, resolvedCounter) }
+            ? {
+                ...p,
+                issueCounter: Math.max(p.issueCounter + 1, resolvedCounter),
+              }
             : p
         ),
         issues: [...ws.issues, finalIssue],
@@ -311,7 +296,7 @@ function applyMutationEvent(
     }
 
     case 'issue:deleted': {
-      const { issueId } = payload as { issueId: string };
+      const { issueId } = payload;
       return {
         ...ws,
         issues: ws.issues.filter((i) => i.id !== issueId),
@@ -319,10 +304,7 @@ function applyMutationEvent(
     }
 
     case 'issue:comment_added': {
-      const { issueId, comment } = payload as {
-        issueId: string;
-        comment: { id: string; authorId: string; body: string; createdAt: string };
-      };
+      const { issueId, comment } = payload;
       return {
         ...ws,
         issues: ws.issues.map((iss) => {
@@ -338,16 +320,7 @@ function applyMutationEvent(
     }
 
     case 'issue:work_logged': {
-      const { issueId, workLog } = payload as {
-        issueId: string;
-        workLog: {
-          id: string;
-          authorId: string;
-          hoursSpent: number;
-          comment: string;
-          loggedAt: string;
-        };
-      };
+      const { issueId, workLog } = payload;
       return {
         ...ws,
         issues: ws.issues.map((iss) => {
@@ -370,7 +343,7 @@ function applyMutationEvent(
     }
 
     case 'sprint:created': {
-      const { sprint } = payload as { sprint: Sprint };
+      const { sprint } = payload;
       if (ws.sprints.some((s) => s.id === sprint.id)) return ws;
       return {
         ...ws,
@@ -379,11 +352,7 @@ function applyMutationEvent(
     }
 
     case 'sprint:started': {
-      const { sprintId, projectId, updates } = payload as {
-        sprintId: string;
-        projectId: string;
-        updates: { name: string; goal: string; startDate: string; endDate: string };
-      };
+      const { sprintId, projectId, updates } = payload;
       return {
         ...ws,
         sprints: ws.sprints.map((s) => {
@@ -400,13 +369,12 @@ function applyMutationEvent(
     }
 
     case 'sprint:completed': {
-      const { sprintId, destinationSprintId, committedPoints, completedPoints } =
-        payload as {
-          sprintId: string;
-          destinationSprintId: string | null;
-          committedPoints: number;
-          completedPoints: number;
-        };
+      const {
+        sprintId,
+        destinationSprintId,
+        committedPoints,
+        completedPoints,
+      } = payload;
       return {
         ...ws,
         sprints: ws.sprints.map((s) =>
@@ -430,7 +398,7 @@ function applyMutationEvent(
     }
 
     case 'sprint:deleted': {
-      const { sprintId } = payload as { sprintId: string };
+      const { sprintId } = payload;
       return {
         ...ws,
         sprints: ws.sprints.filter((s) => s.id !== sprintId),
@@ -441,7 +409,7 @@ function applyMutationEvent(
     }
 
     case 'release:created': {
-      const { release } = payload as { release: ReleaseVersion };
+      const { release } = payload;
       if (ws.releases.some((r) => r.id === release.id)) return ws;
       return {
         ...ws,
@@ -450,7 +418,7 @@ function applyMutationEvent(
     }
 
     case 'release:toggled': {
-      const { releaseId } = payload as { releaseId: string };
+      const { releaseId } = payload;
       return {
         ...ws,
         releases: ws.releases.map((r) =>
@@ -465,7 +433,7 @@ function applyMutationEvent(
     }
 
     case 'component:created': {
-      const { component } = payload as { component: ProjectComponent };
+      const { component } = payload;
       if (ws.components.some((c) => c.id === component.id)) return ws;
       return {
         ...ws,
@@ -474,10 +442,7 @@ function applyMutationEvent(
     }
 
     case 'project:updated': {
-      const { projectId, updates } = payload as {
-        projectId: string;
-        updates: Partial<Project>;
-      };
+      const { projectId, updates } = payload;
       return {
         ...ws,
         projects: ws.projects.map((p) =>
@@ -487,32 +452,28 @@ function applyMutationEvent(
     }
 
     case 'project:created': {
-      const { project, initialSprint, starterIssue } = payload as {
-        project: Project;
-        initialSprint: Sprint;
-        starterIssue: Issue;
-      };
+      const { project, initialSprint, starterIssue } = payload;
       if (ws.projects.some((p) => p.id === project.id)) return ws;
       return {
         ...ws,
         activeProjectId: project.id,
         projects: [...ws.projects, project],
-        sprints: [...ws.sprints, initialSprint],
-        issues: [...ws.issues, starterIssue],
+        sprints: initialSprint ? [...ws.sprints, initialSprint] : ws.sprints,
+        issues: starterIssue ? [...ws.issues, starterIssue] : ws.issues,
       };
     }
 
     case 'user:created': {
-      const { user } = payload as { user: User };
+      const { user } = payload;
       if (ws.users.some((u) => u.id === user.id)) return ws;
-      return {
+      return ensureAllUsersHavePersonalWorkspace({
         ...ws,
         users: [...ws.users, user],
-      };
+      });
     }
 
     case 'filter:saved': {
-      const { filter } = payload as { filter: SavedFilter };
+      const { filter } = payload;
       if (ws.savedFilters.some((f) => f.id === filter.id)) return ws;
       return {
         ...ws,
@@ -521,12 +482,9 @@ function applyMutationEvent(
     }
 
     case 'workspace:imported': {
-      const { updatedWorkspace } = payload as {
-        updatedWorkspace: JiraWorkspaceState;
-      };
+      const { updatedWorkspace } = payload;
       if (!updatedWorkspace) return ws;
 
-      // Merge idempotently so concurrent writes from parallel systems are preserved
       const mergedUsers = [...ws.users];
       updatedWorkspace.users.forEach((u) => {
         if (!mergedUsers.some((existing) => existing.id === u.id)) {
@@ -568,14 +526,14 @@ function applyMutationEvent(
         }
       });
 
-      return {
+      return ensureAllUsersHavePersonalWorkspace({
         ...ws,
         activeProjectId: updatedWorkspace.activeProjectId || ws.activeProjectId,
         users: mergedUsers,
         projects: mergedProjects,
         sprints: mergedSprints,
         issues: mergedIssues,
-      };
+      });
     }
 
     case 'workspace:reset': {
@@ -589,11 +547,7 @@ function applyMutationEvent(
 
 app.post('/api/workspace/events', async (req, res) => {
   try {
-    const { clientId, events } = req.body as {
-      clientId?: string;
-      events: WorkspaceMutationEvent | WorkspaceMutationEvent[];
-    };
-
+    const { clientId, events } = req.body || {};
     const eventList = Array.isArray(events) ? events : [events];
 
     const result = await stateMutex.run(async () => {
@@ -612,7 +566,6 @@ app.post('/api/workspace/events', async (req, res) => {
       };
     });
 
-    // Broadcast authoritative state to all connected parallel systems
     broadcastEvent('workspace:sync', {
       workspace: result.workspace,
       revision: result.revision,
@@ -625,7 +578,7 @@ app.post('/api/workspace/events', async (req, res) => {
       revision: result.revision,
       workspace: result.workspace,
     });
-  } catch (err: unknown) {
+  } catch (err) {
     console.error('Error processing concurrent workspace mutation:', err);
     const message =
       err instanceof Error ? err.message : 'Failed to apply workspace event';
@@ -649,13 +602,10 @@ function getGeminiClient() {
 
 app.post('/api/jira/extract-screenshot', async (req, res) => {
   try {
-    const { images, customInstructions } = req.body as {
-      images: { mimeType: string; data: string }[];
-      customInstructions?: string;
-    };
+    const { images, customInstructions } = req.body || {};
 
     if (!images || !Array.isArray(images) || images.length === 0) {
-      res.status(400).json({ error: 'Please upload at least one Jira screenshot.' });
+      res.status(400).json({ error: 'Please upload at least one board screenshot.' });
       return;
     }
 
@@ -668,8 +618,8 @@ app.post('/api/jira/extract-screenshot', async (req, res) => {
       },
     }));
 
-    const promptText = `You are an expert Jira Workspace Migration & Computer Vision engine.
-Analyze the uploaded Jira screenshot(s) (which may show a Jira Kanban/Scrum Board, Backlog, Sprint, Issue Detail view, Roadmap, or Team list) and extract EVERY detail accurately so we can recreate the exact same profiles, tasks, statuses, priorities, story points, epics, and task assignments.
+    const promptText = `You are an expert Arij Workspace Migration & Computer Vision engine.
+Analyze the uploaded board screenshot(s) (which may show a Kanban/Scrum Board, Backlog, Sprint, Issue Detail view, Roadmap, or Team list) and extract EVERY detail accurately so we can recreate the exact same profiles, tasks, statuses, priorities, story points, epics, and task assignments.
 
 Rules for Extraction:
 1. PROFILES / USERS:
@@ -687,7 +637,6 @@ Rules for Extraction:
 4. ISSUES / TASKS & EXACT ASSIGNMENTS:
    - Extract EVERY issue/card/row visible in the screenshot(s).
    - Map each issue's column or status badge to one of: "TODO", "IN_PROGRESS", "IN_REVIEW", "QA", "DONE".
-     (For example: "To Do" / "Open" / "Backlog" -> "TODO"; "In Progress" / "Doing" / "Active" -> "IN_PROGRESS"; "In Review" / "Code Review" / "PR" -> "IN_REVIEW"; "QA" / "Testing" / "Ready for QA" -> "QA"; "Done" / "Closed" / "Resolved" -> "DONE").
    - Map each issue's type icon/color to one of: "STORY", "TASK", "BUG", "EPIC", "SUBTASK".
    - Map each issue's priority icon/label to one of: "HIGHEST", "HIGH", "MEDIUM", "LOW", "LOWEST".
    - Match each issue's assignee (assigneeName and assigneeInitials) to the exact profile seen on that card/row so the task is assigned to that exact user profile!
@@ -695,7 +644,7 @@ Rules for Extraction:
 
 ${customInstructions ? `Additional user instructions: ${customInstructions}` : ''}`;
 
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: {
         parts: [...imageParts, { text: promptText }],
@@ -705,55 +654,26 @@ ${customInstructions ? `Additional user instructions: ${customInstructions}` : '
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            projectName: {
-              type: Type.STRING,
-              description: 'Detected project name from the Jira screenshot.',
-            },
-            projectKey: {
-              type: Type.STRING,
-              description: 'Detected uppercase project key prefix (2-6 chars), e.g. ENG, KAW, PROJ.',
-            },
-            sprintName: {
-              type: Type.STRING,
-              description: 'Detected active sprint name if visible.',
-            },
-            sprintGoal: {
-              type: Type.STRING,
-              description: 'Detected sprint goal if visible.',
-            },
+            projectName: { type: Type.STRING },
+            projectKey: { type: Type.STRING },
+            sprintName: { type: Type.STRING },
+            sprintGoal: { type: Type.STRING },
             profiles: {
               type: Type.ARRAY,
-              description: 'All user profiles / assignees / reporters detected in the screenshot(s).',
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  name: {
-                    type: Type.STRING,
-                    description: 'Full name or display identifier of the person.',
-                  },
-                  initials: {
-                    type: Type.STRING,
-                    description: '1-2 character uppercase initials shown on avatar.',
-                  },
-                  email: {
-                    type: Type.STRING,
-                    description: 'Email if visible, or generated workspace email.',
-                  },
-                  role: {
-                    type: Type.STRING,
-                    description: 'Role title, e.g. Software Engineer, QA Lead, Product Manager.',
-                  },
-                  department: {
-                    type: Type.STRING,
-                    description: 'Department or team name.',
-                  },
+                  name: { type: Type.STRING },
+                  initials: { type: Type.STRING },
+                  email: { type: Type.STRING },
+                  role: { type: Type.STRING },
+                  department: { type: Type.STRING },
                 },
                 required: ['name', 'initials', 'role'],
               },
             },
             epics: {
               type: Type.ARRAY,
-              description: 'Epics detected in the screenshot(s).',
               items: {
                 type: Type.OBJECT,
                 properties: {
@@ -766,54 +686,20 @@ ${customInstructions ? `Additional user instructions: ${customInstructions}` : '
             },
             issues: {
               type: Type.ARRAY,
-              description: 'All tasks, stories, bugs, and issues detected in the screenshot(s).',
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  key: {
-                    type: Type.STRING,
-                    description: 'Exact issue key from screenshot if visible, e.g. PROJ-101.',
-                  },
-                  title: {
-                    type: Type.STRING,
-                    description: 'Exact issue summary/title.',
-                  },
-                  description: {
-                    type: Type.STRING,
-                    description: 'Issue description or details if visible.',
-                  },
-                  type: {
-                    type: Type.STRING,
-                    description: 'One of: STORY, TASK, BUG, EPIC, SUBTASK.',
-                  },
-                  status: {
-                    type: Type.STRING,
-                    description: 'One of: TODO, IN_PROGRESS, IN_REVIEW, QA, DONE.',
-                  },
-                  priority: {
-                    type: Type.STRING,
-                    description: 'One of: HIGHEST, HIGH, MEDIUM, LOW, LOWEST.',
-                  },
-                  assigneeName: {
-                    type: Type.STRING,
-                    description: 'Name of the profile assigned to this issue, or empty string if unassigned.',
-                  },
-                  assigneeInitials: {
-                    type: Type.STRING,
-                    description: 'Initials on the assignee avatar for this issue.',
-                  },
-                  epicTitle: {
-                    type: Type.STRING,
-                    description: 'Title of the parent Epic if shown on the card.',
-                  },
-                  storyPoints: {
-                    type: Type.NUMBER,
-                    description: 'Story points estimate shown on the card (0 if none).',
-                  },
-                  dueDate: {
-                    type: Type.STRING,
-                    description: 'Due date in YYYY-MM-DD format if visible.',
-                  },
+                  key: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  type: { type: Type.STRING },
+                  status: { type: Type.STRING },
+                  priority: { type: Type.STRING },
+                  assigneeName: { type: Type.STRING },
+                  assigneeInitials: { type: Type.STRING },
+                  epicTitle: { type: Type.STRING },
+                  storyPoints: { type: Type.NUMBER },
+                  dueDate: { type: Type.STRING },
                   labels: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING },
@@ -842,8 +728,8 @@ ${customInstructions ? `Additional user instructions: ${customInstructions}` : '
     const rawText = response.text || '{}';
     const extracted = JSON.parse(rawText);
     res.json(extracted);
-  } catch (error: unknown) {
-    console.error('Error extracting Jira screenshot:', error);
+  } catch (error) {
+    console.error('Error extracting board screenshot:', error);
     const message =
       error instanceof Error ? error.message : 'Failed to analyze screenshot';
     res.status(500).json({ error: message });
@@ -855,12 +741,7 @@ ${customInstructions ? `Additional user instructions: ${customInstructions}` : '
 // ============================================================================
 app.post('/api/github/push', async (req, res) => {
   try {
-    const { token, repoName, isPrivate, description } = req.body as {
-      token: string;
-      repoName: string;
-      isPrivate?: boolean;
-      description?: string;
-    };
+    const { token, repoName, isPrivate, description } = req.body || {};
 
     if (!token || !token.trim()) {
       res.status(400).json({ error: 'GitHub Personal Access Token is required.' });
@@ -868,7 +749,7 @@ app.post('/api/github/push', async (req, res) => {
     }
 
     const cleanToken = token.trim();
-    const cleanRepo = (repoName || 'arij-react-platform')
+    const cleanRepo = (repoName || 'arij-javascript-platform')
       .trim()
       .replace(/[^a-zA-Z0-9._-]/g, '-');
 
@@ -876,7 +757,7 @@ app.post('/api/github/push', async (req, res) => {
       headers: {
         Authorization: `Bearer ${cleanToken}`,
         Accept: 'application/vnd.github+json',
-        'User-Agent': 'arij-react-platform',
+        'User-Agent': 'arij-javascript-platform',
       },
     });
 
@@ -890,11 +771,7 @@ app.post('/api/github/push', async (req, res) => {
       return;
     }
 
-    const ghUser = (await userRes.json()) as {
-      login: string;
-      name?: string;
-      email?: string;
-    };
+    const ghUser = await userRes.json();
     const owner = ghUser.login;
 
     const checkRepoRes = await fetch(
@@ -903,7 +780,7 @@ app.post('/api/github/push', async (req, res) => {
         headers: {
           Authorization: `Bearer ${cleanToken}`,
           Accept: 'application/vnd.github+json',
-          'User-Agent': 'jira-react-platform',
+          'User-Agent': 'arij-javascript-platform',
         },
       }
     );
@@ -915,13 +792,13 @@ app.post('/api/github/push', async (req, res) => {
           Authorization: `Bearer ${cleanToken}`,
           Accept: 'application/vnd.github+json',
           'Content-Type': 'application/json',
-          'User-Agent': 'jira-react-platform',
+          'User-Agent': 'arij-javascript-platform',
         },
         body: JSON.stringify({
           name: cleanRepo,
           description:
             description ||
-            'Arij — Full-featured Agile Project Management & Screenshot Importer built in React & TypeScript',
+            'Arij — Full-featured Agile Project Management & Screenshot Importer built in React & JavaScript',
           private: !!isPrivate,
           auto_init: false,
         }),
@@ -961,7 +838,7 @@ app.post('/api/github/push', async (req, res) => {
         [
           'commit',
           '-m',
-          'Arij: Full-featured React Agile platform with multi-system real-time sync & Screenshot Importer',
+          'Arij: Full-featured React JavaScript Agile platform with multi-system sync & Page-Wise Split View',
         ],
         { cwd: repoRoot }
       );
@@ -985,7 +862,7 @@ app.post('/api/github/push', async (req, res) => {
       repoName: cleanRepo,
       repoUrl: `https://github.com/${owner}/${cleanRepo}`,
     });
-  } catch (error: unknown) {
+  } catch (error) {
     console.error('GitHub push error:', error);
     const message =
       error instanceof Error ? error.message : 'Failed to push repository to GitHub';
@@ -1012,7 +889,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Arij full-stack multi-system server running on http://0.0.0.0:${PORT}`);
+    console.log(`Arij full-stack JavaScript server running on http://0.0.0.0:${PORT}`);
   });
 }
 
