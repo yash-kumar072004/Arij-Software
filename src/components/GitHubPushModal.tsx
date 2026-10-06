@@ -16,9 +16,9 @@ interface GitHubPushModalProps {
 
 export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({ onClose }) => {
   const [token, setToken] = useState('');
-  const [repoName, setRepoName] = useState('jira-react-platform');
+  const [repoName, setRepoName] = useState('arij-react-platform');
   const [description, setDescription] = useState(
-    'Full-featured Agile Jira Project Management & Screenshot Importer built in React & TypeScript'
+    'Arij — Full-featured Agile Project Management & Screenshot Importer built in React & TypeScript'
   );
   const [isPrivate, setIsPrivate] = useState(false);
 
@@ -43,7 +43,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({ onClose }) => 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: token.trim(),
-          repoName: repoName.trim() || 'jira-react-platform',
+          repoName: repoName.trim() || 'arij-react-platform',
           description: description.trim(),
           isPrivate,
         }),
@@ -101,7 +101,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({ onClose }) => 
                 GitHub Personal Access Token (PAT) <span className="text-red-600">*</span>
               </label>
               <a
-                href="https://github.com/settings/tokens/new?scopes=repo&description=Jira+React+Platform"
+                href="https://github.com/settings/tokens/new?scopes=repo&description=Arij+React+Platform"
                 target="_blank"
                 rel="noreferrer"
                 className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
@@ -132,7 +132,7 @@ export const GitHubPushModal: React.FC<GitHubPushModalProps> = ({ onClose }) => 
               required
               value={repoName}
               onChange={(e) => setRepoName(e.target.value)}
-              placeholder="jira-react-platform"
+              placeholder="arij-react-platform"
               className="w-full px-3 py-2 font-mono border border-slate-300 rounded-md focus:outline-none focus:border-blue-600"
             />
           </div>

@@ -457,7 +457,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
               onClick={onOpenScreenshotImporter}
               className="px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
             >
-              Import Jira Screenshot
+              Import Board Screenshot
             </button>
             {activeSprint && (
               <button

@@ -868,7 +868,7 @@ app.post('/api/github/push', async (req, res) => {
     }
 
     const cleanToken = token.trim();
-    const cleanRepo = (repoName || 'jira-react-platform')
+    const cleanRepo = (repoName || 'arij-react-platform')
       .trim()
       .replace(/[^a-zA-Z0-9._-]/g, '-');
 
@@ -876,7 +876,7 @@ app.post('/api/github/push', async (req, res) => {
       headers: {
         Authorization: `Bearer ${cleanToken}`,
         Accept: 'application/vnd.github+json',
-        'User-Agent': 'jira-react-platform',
+        'User-Agent': 'arij-react-platform',
       },
     });
 
@@ -921,7 +921,7 @@ app.post('/api/github/push', async (req, res) => {
           name: cleanRepo,
           description:
             description ||
-            'Full-featured Agile Jira Project Management & Screenshot Importer built in React & TypeScript',
+            'Arij — Full-featured Agile Project Management & Screenshot Importer built in React & TypeScript',
           private: !!isPrivate,
           auto_init: false,
         }),
@@ -961,7 +961,7 @@ app.post('/api/github/push', async (req, res) => {
         [
           'commit',
           '-m',
-          'Full-featured React Jira platform with multi-system real-time sync & Screenshot Importer',
+          'Arij: Full-featured React Agile platform with multi-system real-time sync & Screenshot Importer',
         ],
         { cwd: repoRoot }
       );
@@ -1012,7 +1012,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Jira full-stack multi-system server running on http://0.0.0.0:${PORT}`);
+    console.log(`Arij full-stack multi-system server running on http://0.0.0.0:${PORT}`);
   });
 }
 

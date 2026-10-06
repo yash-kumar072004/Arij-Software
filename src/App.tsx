@@ -1066,7 +1066,7 @@ export default function App() {
           id: targetProjectId,
           key: targetProjectKey,
           name: payload.projectName || `${targetProjectKey} Imported Project`,
-          description: 'Imported directly from Jira screenshot with replicated profiles and task assignments.',
+          description: 'Imported directly from board screenshot with replicated profiles and task assignments.',
           category: 'Software Engineering',
           template: 'Scrum',
           leadId: updatedUsers[0]?.id || prev.currentUserId,
@@ -1086,7 +1086,7 @@ export default function App() {
           id: newSprintId,
           projectId: targetProjectId,
           name: payload.sprintName || `${targetProjectKey} Active Sprint (Imported)`,
-          goal: payload.sprintGoal || 'Replicated sprint tasks and assignments from Jira screenshot.',
+          goal: payload.sprintGoal || 'Replicated sprint tasks and assignments from board screenshot.',
           status: SprintStatus.ACTIVE,
           startDate: now.slice(0, 10),
           endDate: '2026-10-24',
@@ -1215,7 +1215,7 @@ export default function App() {
           title: iss.title,
           description:
             iss.description ||
-            'Imported from Jira screenshot with profile and status assignment.',
+            'Imported from board screenshot with profile and status assignment.',
           type: iss.type,
           status: iss.status,
           priority: iss.priority,
@@ -1258,7 +1258,7 @@ export default function App() {
 
       const newProfilesCreated = updatedUsers.length - initialUserCount;
       setImportBanner(
-        `Imported ${payload.issues.length} tasks and ${payload.profiles.length} team profiles (${newProfilesCreated} newly created) from your Jira screenshot.`
+        `Imported ${payload.issues.length} tasks and ${payload.profiles.length} team profiles (${newProfilesCreated} newly created) into Arij from your screenshot.`
       );
       setTimeout(() => setImportBanner(null), 6000);
 
@@ -1317,7 +1317,7 @@ export default function App() {
           }}
           className="text-lg font-bold tracking-tight text-white whitespace-nowrap"
         >
-          Jira
+          Arij
         </a>
 
         {/* Zone 2: 5 Single-Line Navigation Links */}
@@ -1462,7 +1462,7 @@ export default function App() {
                 className="w-full mt-2 py-2 px-3 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md flex items-center justify-center gap-2 transition-colors"
               >
                 <Camera className="w-3.5 h-3.5 shrink-0" />
-                Import Jira Screenshot
+                Import Board Screenshot
               </button>
 
               {/* Push to GitHub Button */}

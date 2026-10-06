@@ -168,7 +168,7 @@ export const ScreenshotImporterModal: React.FC<ScreenshotImporterModalProps> = (
           ...prev,
           {
             id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            name: file.name || 'jira-screenshot.png',
+            name: file.name || 'arij-screenshot.png',
             mimeType: file.type || 'image/png',
             dataUrl,
             base64Data,
@@ -192,7 +192,7 @@ export const ScreenshotImporterModal: React.FC<ScreenshotImporterModalProps> = (
 
   const handleExtractScreenshots = async () => {
     if (images.length === 0) {
-      setErrorMsg('Please upload or paste at least one Jira screenshot first.');
+      setErrorMsg('Please upload or paste at least one board screenshot first.');
       return;
     }
 
@@ -320,10 +320,10 @@ export const ScreenshotImporterModal: React.FC<ScreenshotImporterModalProps> = (
             <Camera className="w-5 h-5 text-blue-400" />
             <div>
               <h2 className="text-base font-bold tracking-tight">
-                Import from Jira Screenshot — Auto-Create Profiles & Assign Tasks
+                Arij Screenshot Importer — Auto-Create Profiles & Assign Tasks
               </h2>
               <p className="text-xs text-slate-300">
-                Upload or paste screenshots of your existing Jira board, backlog, or issues to replicate team profiles, tasks, statuses, and assignments.
+                Upload or paste screenshots of your existing board, backlog, or issues to replicate team profiles, tasks, statuses, and assignments in Arij.
               </p>
             </div>
           </div>
@@ -406,7 +406,7 @@ export const ScreenshotImporterModal: React.FC<ScreenshotImporterModalProps> = (
                 />
                 <Upload className="w-8 h-8 text-blue-600 mx-auto mb-3" />
                 <div className="text-sm font-bold text-slate-900 mb-1">
-                  Click to upload Jira screenshots, drag & drop files, or press Ctrl+V / Cmd+V to paste
+                  Click to upload board screenshots, drag & drop files, or press Ctrl+V / Cmd+V to paste
                 </div>
                 <p className="text-xs text-slate-500 max-w-lg mx-auto">
                   Supports multiple screenshots at once: Kanban boards, Scrum backlogs, issue detail modals, or team member directories (PNG, JPG, WebP).
