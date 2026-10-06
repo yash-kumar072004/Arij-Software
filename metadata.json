@@ -1,0 +1,6 @@
+{
+  "name": "Jira — Agile Project Management & Issue Tracking",
+  "description": "Full-featured Agile project management platform with Scrum Sprints, Kanban Boards, Backlog Planning, Epics, Roadmaps, Reports, and Issue Tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

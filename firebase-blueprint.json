@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "An Agile software project container with key prefix, workflow template, and column WIP limits.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "key": { "type": "string", "minLength": 2, "maxLength": 10, "pattern": "^[A-Z0-9]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "template": { "type": "string", "enum": ["Scrum", "Kanban"] },
+        "leadId": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "issueCounter": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "key", "name", "template", "leadId", "issueCounter", "createdAt"]
+    },
+    "Sprint": {
+      "title": "Sprint",
+      "description": "A time-boxed Scrum iteration associated with a Project.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "projectId": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "goal": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["PLANNED", "ACTIVE", "COMPLETED"] },
+        "startDate": { "type": "string", "maxLength": 32 },
+        "endDate": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["id", "projectId", "name", "status", "startDate", "endDate"]
+    },
+    "Issue": {
+      "title": "Issue",
+      "description": "An Agile work item (Epic, Story, Task, Bug, or Sub-task) tracked within a project.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "projectId": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "key": { "type": "string", "maxLength": 24, "pattern": "^[A-Z0-9\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "type": { "type": "string", "enum": ["EPIC", "STORY", "TASK", "BUG", "SUBTASK"] },
+        "status": { "type": "string", "enum": ["TODO", "IN_PROGRESS", "IN_REVIEW", "QA", "DONE"] },
+        "priority": { "type": "string", "enum": ["HIGHEST", "HIGH", "MEDIUM", "LOW", "LOWEST"] },
+        "reporterId": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "storyPoints": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "projectId", "key", "title", "type", "status", "priority", "reporterId", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "Top-level Agile projects."
+    },
+    "/projects/{projectId}/sprints/{sprintId}": {
+      "schema": { "$ref": "#/entities/Sprint" },
+      "description": "Scrum sprints belonging to a project."
+    },
+    "/projects/{projectId}/issues/{issueId}": {
+      "schema": { "$ref": "#/entities/Issue" },
+      "description": "Issues, stories, epics, and bugs belonging to a project."
+    }
+  }
+}
