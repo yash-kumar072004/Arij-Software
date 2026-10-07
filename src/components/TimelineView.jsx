@@ -5,13 +5,13 @@ import {
   Plus,
   Zap,
 } from 'lucide-react';
-import { IssueStatus, IssueType } from '../types/jira.js';
+import { IssueStatus, IssueType } from '../types/arij.js';
 import {
   formatShortDate,
   IssueTypeIcon,
   STATUS_CONFIG,
   UserAvatar,
-} from './JiraPrimitives.jsx';
+} from './ArijPrimitives.jsx';
 
 const TIMELINE_START = new Date('2026-09-15T00:00:00Z').getTime();
 const TIMELINE_END = new Date('2026-11-10T00:00:00Z').getTime();

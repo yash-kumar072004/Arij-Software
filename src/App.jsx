@@ -1,21 +1,31 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
+  Bell,
+  Bot,
+  Building2,
   Calendar,
   Camera,
   CheckCircle2,
   FolderGit2,
+  GitBranch,
+  Headphones,
   Kanban,
+  Keyboard,
   Layers,
+  LayoutDashboard,
   ListFilter,
+  Moon,
   Package,
   Plus,
   RotateCcw,
   Search,
   Settings,
+  Sun,
   UserCheck,
   Users,
   X,
+  Zap,
 } from 'lucide-react';
 import {
   IssuePriority,
@@ -23,12 +33,12 @@ import {
   IssueType,
   NavigationTab,
   SprintStatus,
-} from './types/jira.js';
+} from './types/arij.js';
 import {
   createPersonalWorkspaceBundle,
   INITIAL_WORKSPACE_STATE,
 } from './data/initialWorkspace.js';
-import { IssueTypeIcon, UserAvatar } from './components/JiraPrimitives.jsx';
+import { ArijLogo, IssueTypeIcon, UserAvatar } from './components/ArijPrimitives.jsx';
 import { BoardView } from './components/BoardView.jsx';
 import { BacklogView } from './components/BacklogView.jsx';
 import { TimelineView } from './components/TimelineView.jsx';
@@ -37,6 +47,11 @@ import { ReportsView } from './components/ReportsView.jsx';
 import { ReleasesAndComponentsView } from './components/ReleasesAndComponentsView.jsx';
 import { ProjectSettingsView } from './components/ProjectSettingsView.jsx';
 import { MyWorkspaceView } from './components/MyWorkspaceView.jsx';
+import { DashboardsAndPlanningView } from './components/DashboardsAndPlanningView.jsx';
+import { AutomationAndWorkflowsView } from './components/AutomationAndWorkflowsView.jsx';
+import { ArijAiAssistantView } from './components/ArijAiAssistantView.jsx';
+import { ServiceAndItsmView } from './components/ServiceAndItsmView.jsx';
+import { EnterpriseAndDevView } from './components/EnterpriseAndDevView.jsx';
 import {
   CompleteSprintModal,
   CreateIssueModal,
@@ -46,6 +61,11 @@ import {
 import { IssueDetailModal } from './components/IssueDetailModal.jsx';
 import { ScreenshotImporterModal } from './components/ScreenshotImporterModal.jsx';
 import { GitHubPushModal } from './components/GitHubPushModal.jsx';
+import {
+  KeyboardShortcutsModal,
+  NotificationsDrawerModal,
+  UserAccountCenterModal,
+} from './components/UserAccountAndNotificationsModals.jsx';
 
 const STORAGE_KEY = 'arij_enterprise_workspace_js_v2';
 const CLIENT_ID_KEY = 'arij_system_client_id_v2';
@@ -317,13 +337,99 @@ export default function App() {
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showScreenshotImporter, setShowScreenshotImporter] = useState(false);
   const [showGitHubModal, setShowGitHubModal] = useState(false);
+  const [showUserAccountModal, setShowUserAccountModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [sprintToStart, setSprintToStart] = useState(null);
   const [showCompleteSprintModal, setShowCompleteSprintModal] = useState(false);
   const [importBanner, setImportBanner] = useState(null);
 
+  // Organizations container (Section 2: Arij -> Organization -> Projects)
+  const [organizations, setOrganizations] = useState([
+    {
+      id: 'org-kawach',
+      name: 'Kawach AI Enterprise',
+      domain: 'kawach.ai',
+      plan: 'Enterprise Plan',
+    },
+    {
+      id: 'org-abc',
+      name: 'ABC Company Workspace',
+      domain: 'abccompany.com',
+      plan: 'Business Plan',
+    },
+  ]);
+  const [activeOrgId, setActiveOrgId] = useState('org-kawach');
+
+  // Notifications stream (Section 20)
+  const [notifications, setNotifications] = useState([
+    {
+      id: 'notif-1',
+      typeLabel: '@MENTION · COMMENT',
+      category: 'MENTION',
+      title: 'You were @mentioned on KAW-101',
+      body: 'Arjun Mehta commented: "@team Please verify eBPF packet ring buffer throughput before QA sign-off."',
+      time: '4m ago',
+      read: false,
+      issueId: 'iss-101',
+    },
+    {
+      id: 'notif-2',
+      typeLabel: 'STATUS CHANGED',
+      category: 'STATUS',
+      title: 'KAW-102 moved to IN PROGRESS',
+      body: 'Automated workflow validator verified story points and branch link.',
+      time: '18m ago',
+      read: false,
+      issueId: 'iss-102',
+    },
+    {
+      id: 'notif-3',
+      typeLabel: 'SPRINT TELEMETRY',
+      category: 'SPRINT',
+      title: 'Active Sprint Burndown On Track',
+      body: 'Sprint velocity is tracking 12% above target commitment.',
+      time: '1h ago',
+      read: true,
+      issueId: null,
+    },
+  ]);
+
   // Global Quick Search
   const [globalSearch, setGlobalSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const searchInputRef = useRef(null);
+
+  // Global Keyboard Shortcuts (Sections 1 & 34)
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        setShowCreateIssueModal(true);
+      } else if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcutsModal((prev) => !prev);
+      } else if (e.key === 'b') {
+        setActiveTab(NavigationTab.BOARD);
+      } else if (e.key === 'm') {
+        setActiveTab(NavigationTab.MY_SPACE);
+      } else if (e.key === 'd') {
+        setActiveTab(NavigationTab.DASHBOARDS);
+      } else if (e.key === 'i') {
+        setActiveTab(NavigationTab.ISSUES);
+      } else if (e.key === 'a') {
+        setActiveTab(NavigationTab.AI_HUB);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const currentUser = useMemo(() => {
     return (
@@ -1481,20 +1587,35 @@ export default function App() {
       i.status !== IssueStatus.DONE
   ).length;
 
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
+
+  const handleUpdateUserProfile = (userId, updates) => {
+    setWorkspace((prev) => ({
+      ...prev,
+      users: prev.users.map((u) =>
+        u.id === userId ? { ...u, ...updates } : u
+      ),
+    }));
+  };
+
   return (
-    <div className="min-h-screen h-screen flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div
+      className={`min-h-screen h-screen flex flex-col bg-slate-50 text-slate-900 overflow-hidden ${
+        darkMode ? 'invert hue-rotate-180' : ''
+      }`}
+    >
       {/* Strict 3-Zone Top Bar Contract */}
       <header className="h-14 px-6 bg-slate-900 text-white border-b border-slate-800 flex items-center justify-between shrink-0 z-30">
-        {/* Zone 1: Single text element Brand Wordmark */}
+        {/* Zone 1: Single Official Arij Logo */}
         <a
           href="#board"
           onClick={(e) => {
             e.preventDefault();
             setActiveTab(NavigationTab.BOARD);
           }}
-          className="text-lg font-bold tracking-tight text-white whitespace-nowrap"
+          className="flex items-center text-lg font-bold tracking-tight text-white whitespace-nowrap group"
         >
-          Arij
+          <ArijLogo variant="horizontal" theme="dark" />
         </a>
 
         {/* Zone 2: 5 Single-Line Navigation Links */}
@@ -1541,7 +1662,7 @@ export default function App() {
                 : 'hover:text-white hover:underline underline-offset-8'
             }`}
           >
-            Issues & JQL
+            Issues &amp; AQL
           </button>
           <button
             type="button"
@@ -1556,8 +1677,8 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Zone 3: 2 Primary Actions (+ Create Issue & Active User Selector) */}
-        <div className="flex items-center gap-3">
+        {/* Zone 3: Primary Actions (+ Create Issue, Notifications, Theme, Shortcuts, Account) */}
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => setShowCreateIssueModal(true)}
@@ -1565,6 +1686,45 @@ export default function App() {
           >
             <Plus className="w-3.5 h-3.5" />
             Create Issue
+          </button>
+
+          {/* Notifications Bell (Section 20) */}
+          <button
+            type="button"
+            onClick={() => setShowNotificationsModal(true)}
+            title="Notifications Center"
+            className="relative p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500 text-[10px] font-mono font-bold text-white flex items-center justify-center">
+                {unreadNotificationsCount}
+              </span>
+            )}
+          </button>
+
+          {/* Dark / Light Mode Toggle (Section 1) */}
+          <button
+            type="button"
+            onClick={() => setDarkMode((prev) => !prev)}
+            title="Toggle Dark / Light Mode"
+            className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+          >
+            {darkMode ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4" />
+            )}
+          </button>
+
+          {/* Keyboard Shortcuts (?) */}
+          <button
+            type="button"
+            onClick={() => setShowShortcutsModal(true)}
+            title="Keyboard Shortcuts (?)"
+            className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hidden sm:inline-flex"
+          >
+            <Keyboard className="w-4 h-4" />
           </button>
 
           <select
@@ -1579,6 +1739,17 @@ export default function App() {
               </option>
             ))}
           </select>
+
+          {/* User Account, Auth & Profile Modal Trigger (Section 1) */}
+          <button
+            type="button"
+            onClick={() => setShowUserAccountModal(true)}
+            title="Account, Auth, 2FA, Preferences & Organization"
+            className="px-2.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 rounded-md flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <UserAvatar user={currentUser} size="xs" />
+            <span className="hidden lg:inline">Account</span>
+          </button>
         </div>
       </header>
 
@@ -1587,6 +1758,31 @@ export default function App() {
         {/* Left Project & Navigation Sidebar */}
         <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 overflow-y-auto">
           <div className="p-4 space-y-5">
+            {/* Top-Level Organization Container (Section 2: Arij -> Organization -> Project) */}
+            <div className="flex items-center justify-between px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <select
+                  value={activeOrgId}
+                  onChange={(e) => setActiveOrgId(e.target.value)}
+                  aria-label="Organization switcher"
+                  className="bg-transparent font-bold text-slate-800 truncate focus:outline-none"
+                >
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUserAccountModal(true)}
+                className="text-[10px] font-semibold text-blue-600 hover:underline shrink-0"
+              >
+                Org
+              </button>
+            </div>
             {/* Per-User Workspace Scope Toggle ("Every User Has Their Own") */}
             <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
               <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
@@ -1701,6 +1897,7 @@ export default function App() {
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={globalSearch}
                 onFocus={() => setSearchFocused(true)}
@@ -1742,10 +1939,10 @@ export default function App() {
               )}
             </div>
 
-            {/* Planning & Development Navigation */}
+            {/* ARIJ Architecture Navigation: PLAN · BUILD · TRACK · AUTOMATE · AI */}
             <div className="space-y-1">
-              <div className="px-2 pb-1 text-[11px] font-semibold text-slate-400">
-                Personal & Project Views
+              <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Plan &amp; Build
               </div>
 
               <button
@@ -1764,6 +1961,19 @@ export default function App() {
                 <span className="font-mono tabular-nums text-[11px] text-blue-600 font-bold">
                   {myAssignedCount}
                 </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab(NavigationTab.DASHBOARDS)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2.5 transition-colors ${
+                  activeTab === NavigationTab.DASHBOARDS
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboards, OKRs &amp; RICE
               </button>
 
               <button
@@ -1797,7 +2007,7 @@ export default function App() {
               >
                 <span className="flex items-center gap-2.5">
                   <Layers className="w-4 h-4" />
-                  Backlog & Sprints
+                  Backlog &amp; Sprints
                 </span>
                 <span className="font-mono tabular-nums text-[11px] text-slate-400">
                   {projectIssues.filter((i) => !i.sprintId && i.type !== IssueType.EPIC).length}
@@ -1817,6 +2027,10 @@ export default function App() {
                 Timeline Roadmap
               </button>
 
+              <div className="px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Track, Automate &amp; AI
+              </div>
+
               <button
                 type="button"
                 onClick={() => setActiveTab(NavigationTab.ISSUES)}
@@ -1828,7 +2042,7 @@ export default function App() {
               >
                 <span className="flex items-center gap-2.5">
                   <ListFilter className="w-4 h-4" />
-                  Issues & JQL Filters
+                  Issues &amp; AQL Filters
                 </span>
                 <span className="font-mono tabular-nums text-[11px] text-slate-400">
                   {openIssuesCount}
@@ -1858,7 +2072,59 @@ export default function App() {
                 }`}
               >
                 <Package className="w-4 h-4" />
-                Releases & Components
+                Releases &amp; Components
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab(NavigationTab.AUTOMATION)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2.5 transition-colors ${
+                  activeTab === NavigationTab.AUTOMATION
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Zap className="w-4 h-4 text-amber-500" />
+                Automation &amp; Workflows
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab(NavigationTab.AI_HUB)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2.5 transition-colors ${
+                  activeTab === NavigationTab.AI_HUB
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Bot className="w-4 h-4 text-blue-600" />
+                Arij AI Assistant
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab(NavigationTab.SERVICE_ITSM)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2.5 transition-colors ${
+                  activeTab === NavigationTab.SERVICE_ITSM
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Headphones className="w-4 h-4" />
+                Service Desk, ITSM &amp; CMDB
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab(NavigationTab.ENTERPRISE_DEV)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2.5 transition-colors ${
+                  activeTab === NavigationTab.ENTERPRISE_DEV
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <GitBranch className="w-4 h-4" />
+                Dev CI/CD, Org &amp; API
               </button>
 
               <button
@@ -2091,6 +2357,64 @@ export default function App() {
               onAddUser={(u) => handleAddUser(u, false)}
             />
           )}
+
+          {activeTab === NavigationTab.DASHBOARDS && (
+            <DashboardsAndPlanningView
+              project={activeProject}
+              activeSprint={activeSprint}
+              issues={projectIssues}
+              epics={projectEpics}
+              users={workspace.users}
+              currentUserId={workspace.currentUserId}
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              onQuickCreateIssue={handleQuickCreateIssue}
+            />
+          )}
+
+          {activeTab === NavigationTab.AUTOMATION && (
+            <AutomationAndWorkflowsView
+              project={activeProject}
+              issues={projectIssues}
+              users={workspace.users}
+              currentUserId={workspace.currentUserId}
+              onUpdateIssue={handleUpdateIssue}
+              onAddComment={handleAddComment}
+            />
+          )}
+
+          {activeTab === NavigationTab.AI_HUB && (
+            <ArijAiAssistantView
+              project={activeProject}
+              activeSprint={activeSprint}
+              issues={projectIssues}
+              epics={projectEpics}
+              users={workspace.users}
+              currentUserId={workspace.currentUserId}
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              onFullCreateIssue={handleFullCreateIssue}
+            />
+          )}
+
+          {activeTab === NavigationTab.SERVICE_ITSM && (
+            <ServiceAndItsmView
+              project={activeProject}
+              issues={projectIssues}
+              users={workspace.users}
+              currentUserId={workspace.currentUserId}
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              onQuickCreateIssue={handleQuickCreateIssue}
+            />
+          )}
+
+          {activeTab === NavigationTab.ENTERPRISE_DEV && (
+            <EnterpriseAndDevView
+              project={activeProject}
+              issues={projectIssues}
+              users={workspace.users}
+              currentUser={currentUser}
+              onAddUser={(u) => handleAddUser(u, false)}
+            />
+          )}
         </main>
       </div>
 
@@ -2184,6 +2508,53 @@ export default function App() {
       {/* Push to GitHub Modal */}
       {showGitHubModal && (
         <GitHubPushModal onClose={() => setShowGitHubModal(false)} />
+      )}
+
+      {/* User Account, Authentication, 2FA, Preferences & Organization Modal */}
+      {showUserAccountModal && (
+        <UserAccountCenterModal
+          currentUser={currentUser}
+          users={workspace.users}
+          projects={visibleProjects}
+          organizations={organizations}
+          activeOrgId={activeOrgId}
+          darkMode={darkMode}
+          onToggleDarkMode={(val) => setDarkMode(val)}
+          onSwitchUser={handleSwitchUser}
+          onUpdateUserProfile={handleUpdateUserProfile}
+          onAddUserAccount={(u) => handleAddUser(u, true)}
+          onSwitchOrg={(id) => setActiveOrgId(id)}
+          onCreateOrg={(org) => {
+            const created = {
+              id: `org-${Date.now()}`,
+              name: org.name,
+              domain: org.domain,
+              plan: 'Enterprise Plan',
+            };
+            setOrganizations((prev) => [...prev, created]);
+            setActiveOrgId(created.id);
+          }}
+          onClose={() => setShowUserAccountModal(false)}
+        />
+      )}
+
+      {/* Notifications Drawer Modal */}
+      {showNotificationsModal && (
+        <NotificationsDrawerModal
+          notifications={notifications}
+          onMarkAllRead={() =>
+            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+          }
+          onSelectIssue={(id) => setSelectedIssueId(id)}
+          onClose={() => setShowNotificationsModal(false)}
+        />
+      )}
+
+      {/* Keyboard Shortcuts Reference Modal */}
+      {showShortcutsModal && (
+        <KeyboardShortcutsModal
+          onClose={() => setShowShortcutsModal(false)}
+        />
       )}
     </div>
   );

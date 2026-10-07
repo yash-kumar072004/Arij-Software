@@ -4,7 +4,7 @@ import {
   IssuePriority,
   IssueStatus,
   IssueType,
-} from '../types/jira.js';
+} from '../types/arij.js';
 
 // ============================================================================
 // 1. CREATE ISSUE MODAL
@@ -122,6 +122,14 @@ export const CreateIssueModal = ({
                 <option value={IssueType.TASK}>Task</option>
                 <option value={IssueType.BUG}>Bug</option>
                 <option value={IssueType.EPIC}>Epic</option>
+                <option value={IssueType.INITIATIVE}>Initiative</option>
+                <option value={IssueType.FEATURE}>Feature</option>
+                <option value={IssueType.IMPROVEMENT}>Improvement</option>
+                <option value={IssueType.REQUEST}>Request</option>
+                <option value={IssueType.INCIDENT}>Incident</option>
+                <option value={IssueType.PROBLEM}>Problem</option>
+                <option value={IssueType.CHANGE}>Change</option>
+                <option value={IssueType.SUBTASK}>Sub-task</option>
               </select>
             </div>
           </div>
@@ -711,22 +719,28 @@ export const CreateProjectModal = ({
               >
                 <option value="Scrum">Scrum (Sprints & Velocity)</option>
                 <option value="Kanban">Kanban (Continuous Flow)</option>
+                <option value="Bug Tracking">Bug Tracking & QA</option>
+                <option value="ITSM Service Desk">ITSM Service Desk & Queues</option>
+                <option value="Product Discovery">Product Discovery & RICE</option>
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Category
+                Project Type / Category
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md text-slate-900"
               >
-                <option value="Software Engineering">Software Engineering</option>
-                <option value="Infrastructure & SRE">Infrastructure & SRE</option>
-                <option value="Product Management">Product Management</option>
-                <option value="Security Operations">Security Operations</option>
+                <option value="Software Project">Software Project</option>
+                <option value="Business Project">Business Project</option>
+                <option value="Marketing Project">Marketing Project</option>
+                <option value="Operations Project">Operations Project</option>
+                <option value="Service Project">Service Project (ITSM)</option>
+                <option value="Product Project">Product Project</option>
+                <option value="Personal Project">Personal Project</option>
               </select>
             </div>
           </div>

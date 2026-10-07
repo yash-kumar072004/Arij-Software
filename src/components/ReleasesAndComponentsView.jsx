@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Box, CheckCircle2, Clock, Package, Plus } from 'lucide-react';
-import { IssueStatus, IssueType } from '../types/jira.js';
+import { IssueStatus, IssueType } from '../types/arij.js';
 import {
   formatShortDate,
   IssueTypeIcon,
   STATUS_CONFIG,
   UserAvatar,
-} from './JiraPrimitives.jsx';
+} from './ArijPrimitives.jsx';
 
 export const ReleasesAndComponentsView = ({
   project,

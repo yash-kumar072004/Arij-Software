@@ -3,7 +3,7 @@ import {
   IssueStatus,
   IssueType,
   SprintStatus,
-} from '../types/jira.js';
+} from '../types/arij.js';
 
 export const INITIAL_USERS = [
   {
@@ -375,7 +375,7 @@ export const INITIAL_WORKSPACE_STATE = {
       id: 'cmp-3',
       projectId: 'prj-1',
       name: 'Security Console UI',
-      description: 'React interactive dashboards, Kanban workflows, and JQL search bar.',
+      description: 'React interactive dashboards, Kanban workflows, and AQL search bar.',
       leadId: 'usr-2',
     },
     {
@@ -737,7 +737,7 @@ export const INITIAL_WORKSPACE_STATE = {
       id: 'iss-107',
       projectId: 'prj-1',
       key: 'KAW-107',
-      title: 'Add JQL query autocomplete and syntax validator for security events',
+      title: 'Add AQL query autocomplete and syntax validator for security events',
       description:
         'Support structured filtering by `assignee`, `priority`, `status`, `type`, `component`, and free-text summary search with instant table updates.',
       type: IssueType.STORY,
@@ -751,7 +751,7 @@ export const INITIAL_WORKSPACE_STATE = {
       originalEstimateHours: 16,
       timeSpentHours: 14,
       remainingEstimateHours: 2,
-      labels: ['jql', 'search', 'ui'],
+      labels: ['aql', 'search', 'ui'],
       componentId: 'cmp-3',
       fixVersionId: 'rel-2',
       startDate: '2026-09-30',
@@ -760,7 +760,7 @@ export const INITIAL_WORKSPACE_STATE = {
         {
           id: 'sub-9',
           key: 'KAW-107-1',
-          title: 'Build JQL tokenizer and AST evaluator',
+          title: 'Build AQL tokenizer and AST evaluator',
           completed: true,
           assigneeId: 'usr-2',
         },

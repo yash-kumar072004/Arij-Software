@@ -1,11 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   CheckSquare,
   Clock,
   Copy,
+  Eye,
+  GitBranch,
   History,
   Link2,
   MessageSquare,
+  Paperclip,
   Plus,
   Square,
   Trash2,
@@ -13,8 +17,9 @@ import {
 } from 'lucide-react';
 import {
   IssuePriority,
+  IssueStatus,
   IssueType,
-} from '../types/jira.js';
+} from '../types/arij.js';
 import {
   formatShortDate,
   IssueTypeIcon,
@@ -23,7 +28,7 @@ import {
   STATUS_ORDER,
   TYPE_CONFIG,
   UserAvatar,
-} from './JiraPrimitives.jsx';
+} from './ArijPrimitives.jsx';
 
 export const IssueDetailModal = ({
   issue,
@@ -62,6 +67,45 @@ export const IssueDetailModal = ({
 
   const [logHours, setLogHours] = useState('');
   const [logComment, setLogComment] = useState('');
+
+  // Attachments state (Section 17)
+  const [newAttachmentName, setNewAttachmentName] = useState('');
+  const [showAddAttachment, setShowAddAttachment] = useState(false);
+
+  // Emoji reactions per comment
+  const [commentReactions, setCommentReactions] = useState({});
+
+  const isWatching = (issue.watcherIds || []).includes(
+    users[0]?.id || 'usr-1'
+  );
+
+  const handleToggleWatch = () => {
+    const uid = users[0]?.id || 'usr-1';
+    const current = issue.watcherIds || [];
+    const next = current.includes(uid)
+      ? current.filter((id) => id !== uid)
+      : [...current, uid];
+    onUpdateIssue(issue.id, { watcherIds: next });
+  };
+
+  const handleAddAttachmentSubmit = (e) => {
+    e.preventDefault();
+    if (!newAttachmentName.trim()) return;
+    const current = issue.attachments || [];
+    onUpdateIssue(issue.id, {
+      attachments: [
+        ...current,
+        {
+          id: `att-${Date.now()}`,
+          name: newAttachmentName.trim(),
+          size: '420 KB',
+          uploadedAt: new Date().toISOString().slice(0, 10),
+        },
+      ],
+    });
+    setNewAttachmentName('');
+    setShowAddAttachment(false);
+  };
 
   const userMap = useMemo(() => {
     const map = {};
@@ -208,10 +252,18 @@ export const IssueDetailModal = ({
               aria-label="Issue Type"
               className="text-xs font-semibold bg-white border border-slate-300 rounded px-2 py-1 text-slate-700"
             >
+              <option value={IssueType.INITIATIVE}>Initiative</option>
               <option value={IssueType.EPIC}>Epic</option>
               <option value={IssueType.STORY}>Story</option>
+              <option value={IssueType.FEATURE}>Feature</option>
               <option value={IssueType.TASK}>Task</option>
+              <option value={IssueType.IMPROVEMENT}>Improvement</option>
               <option value={IssueType.BUG}>Bug</option>
+              <option value={IssueType.INCIDENT}>Incident</option>
+              <option value={IssueType.PROBLEM}>Problem</option>
+              <option value={IssueType.CHANGE}>Change</option>
+              <option value={IssueType.REQUEST}>Request</option>
+              <option value={IssueType.SUBTASK}>Sub-task</option>
             </select>
             <IssueTypeIcon type={issue.type} className="w-4 h-4" />
             <span className="font-mono tabular-nums text-sm font-bold text-blue-700">
@@ -220,6 +272,20 @@ export const IssueDetailModal = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleToggleWatch}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-colors border ${
+                isWatching
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+              title="Watch / Unwatch issue"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              {isWatching ? 'Watching' : 'Watch'} (
+              {(issue.watcherIds || []).length})
+            </button>
             <button
               type="button"
               onClick={() => onCloneIssue(issue)}
@@ -482,6 +548,13 @@ export const IssueDetailModal = ({
                     <option value="IS_BLOCKED_BY">is blocked by</option>
                     <option value="RELATES_TO">relates to</option>
                     <option value="DUPLICATES">duplicates</option>
+                    <option value="IS_DUPLICATED_BY">is duplicated by</option>
+                    <option value="DEPENDS_ON">depends on</option>
+                    <option value="IS_DEPENDED_ON_BY">is depended on by</option>
+                    <option value="CAUSES">causes</option>
+                    <option value="CAUSED_BY">caused by</option>
+                    <option value="PARENT_OF">parent of</option>
+                    <option value="CHILD_OF">child of</option>
                   </select>
                   <select
                     value={linkTargetId}
@@ -512,6 +585,10 @@ export const IssueDetailModal = ({
                   {issue.links.map((lnk) => {
                     const target = issueMap[lnk.targetIssueId];
                     if (!target) return null;
+                    const isBlockingWarning =
+                      (lnk.type === 'IS_BLOCKED_BY' ||
+                        lnk.type === 'DEPENDS_ON') &&
+                      target.status !== IssueStatus.DONE;
                     return (
                       <div
                         key={lnk.id}
@@ -531,6 +608,12 @@ export const IssueDetailModal = ({
                           <span className="text-slate-800 truncate">
                             {target.title}
                           </span>
+                          {isBlockingWarning && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-600 shrink-0">
+                              <AlertTriangle className="w-3 h-3" />
+                              Blocker Unresolved
+                            </span>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -542,6 +625,78 @@ export const IssueDetailModal = ({
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            {/* Attachments & Files (Section 17) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Attachments &amp; Files ({(issue.attachments || []).length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAttachment(!showAddAttachment)}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                  Attach File / Spec
+                </button>
+              </div>
+
+              {showAddAttachment && (
+                <form
+                  onSubmit={handleAddAttachmentSubmit}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={newAttachmentName}
+                    onChange={(e) => setNewAttachmentName(e.target.value)}
+                    placeholder="e.g. architecture-diagram.png or log-trace.json"
+                    className="flex-1 text-xs bg-white border border-blue-500 rounded px-3 py-1.5"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded"
+                  >
+                    Attach
+                  </button>
+                </form>
+              )}
+
+              {(issue.attachments || []).length > 0 && (
+                <div className="divide-y divide-slate-200 border border-slate-200 rounded-md">
+                  {(issue.attachments || []).map((att) => (
+                    <div
+                      key={att.id}
+                      className="px-3 py-2 bg-white flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Paperclip className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="font-medium text-slate-800">
+                          {att.name}
+                        </span>
+                        <span className="font-mono text-[11px] text-slate-400">
+                          {att.size} · {att.uploadedAt}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onUpdateIssue(issue.id, {
+                            attachments: (issue.attachments || []).filter(
+                              (x) => x.id !== att.id
+                            ),
+                          })
+                        }
+                        className="text-slate-400 hover:text-red-600"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -585,11 +740,40 @@ export const IssueDetailModal = ({
                   <History className="w-3.5 h-3.5" />
                   Audit Trail ({issue.history.length})
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveActivityTab('DEV_CICD')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md flex items-center gap-1.5 ${
+                    activeActivityTab === 'DEV_CICD'
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <GitBranch className="w-3.5 h-3.5" />
+                  Dev &amp; CI/CD
+                </button>
               </div>
 
               {activeActivityTab === 'COMMENTS' && (
                 <div className="space-y-4">
                   <form onSubmit={handleCommentSubmit} className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                      <span>Quick @mention:</span>
+                      {users.slice(0, 4).map((u) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() =>
+                            setCommentBody((prev) =>
+                              `${prev} @${u.name.split(' ')[0]} `.trimStart()
+                            )
+                          }
+                          className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 text-blue-700 font-mono"
+                        >
+                          @{u.name.split(' ')[0]}
+                        </button>
+                      ))}
+                    </div>
                     <textarea
                       rows={2}
                       value={commentBody}
@@ -610,10 +794,11 @@ export const IssueDetailModal = ({
                   <div className="space-y-3">
                     {issue.comments.map((c) => {
                       const author = userMap[c.authorId];
+                      const rx = commentReactions[c.id] || {};
                       return (
                         <div
                           key={c.id}
-                          className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1"
+                          className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1.5"
                         >
                           <div className="flex items-center justify-between text-xs">
                             <UserAvatar user={author} size="xs" showName />
@@ -624,9 +809,51 @@ export const IssueDetailModal = ({
                           <p className="text-xs text-slate-700 pl-7">
                             {c.body}
                           </p>
+                          <div className="pl-7 flex items-center gap-1.5 pt-1">
+                            {['👍', '🚀', '❤️', '👀'].map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() =>
+                                  setCommentReactions((prev) => ({
+                                    ...prev,
+                                    [c.id]: {
+                                      ...(prev[c.id] || {}),
+                                      [emoji]: ((prev[c.id] || {})[emoji] || 0) + 1,
+                                    },
+                                  }))
+                                }
+                                className="px-1.5 py-0.5 text-[11px] bg-white border border-slate-200 rounded hover:bg-slate-100"
+                              >
+                                {emoji} {rx[emoji] ? rx[emoji] : ''}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {activeActivityTab === 'DEV_CICD' && (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-md space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">
+                      Git Branch, Pull Request &amp; Deployment Telemetry
+                    </span>
+                    <span className="font-mono text-[11px] text-emerald-700 font-semibold">
+                      CI Build Passed
+                    </span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-700 bg-white border border-slate-200 rounded p-2">
+                    git checkout -b feature/{issue.key.toLowerCase()}-impl
+                  </div>
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Pull Request #{issue.order + 30} · Merged to main</span>
+                    <span className="font-mono text-blue-700">
+                      Environment: Production (ap-south-1)
+                    </span>
                   </div>
                 </div>
               )}
@@ -935,7 +1162,22 @@ export const IssueDetailModal = ({
                 </div>
               </div>
 
-              {/* Due Date */}
+              {/* Start Date & Due Date */}
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-slate-500 font-medium">Start Date</span>
+                <div className="col-span-2">
+                  <input
+                    type="date"
+                    value={issue.startDate || '2026-10-05'}
+                    onChange={(e) =>
+                      onUpdateIssue(issue.id, { startDate: e.target.value })
+                    }
+                    aria-label="Start Date"
+                    className="w-full px-2.5 py-1.5 font-mono bg-slate-50 border border-slate-200 rounded text-slate-900"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 items-center gap-2">
                 <span className="text-slate-500 font-medium">Due Date</span>
                 <div className="col-span-2">
@@ -948,6 +1190,38 @@ export const IssueDetailModal = ({
                     aria-label="Due Date"
                     className="w-full px-2.5 py-1.5 font-mono bg-slate-50 border border-slate-200 rounded text-slate-900"
                   />
+                </div>
+              </div>
+
+              {/* Environment & Custom SLA Field (Section 5) */}
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-slate-500 font-medium">Environment</span>
+                <div className="col-span-2">
+                  <input
+                    type="text"
+                    value={issue.environment || 'Production · K8s Cluster'}
+                    onChange={(e) =>
+                      onUpdateIssue(issue.id, { environment: e.target.value })
+                    }
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-slate-500 font-medium">SLA Tier</span>
+                <div className="col-span-2">
+                  <select
+                    value={issue.slaTier || 'Enterprise P1 (<15m)'}
+                    onChange={(e) =>
+                      onUpdateIssue(issue.id, { slaTier: e.target.value })
+                    }
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-900"
+                  >
+                    <option>Enterprise P1 (&lt;15m)</option>
+                    <option>Standard P2 (&lt;4h)</option>
+                    <option>Internal Engineering</option>
+                  </select>
                 </div>
               </div>
 

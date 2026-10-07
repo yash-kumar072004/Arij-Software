@@ -6,8 +6,8 @@ import {
   Zap,
   Clock,
 } from 'lucide-react';
-import { IssueStatus, IssueType, SprintStatus } from '../types/jira.js';
-import { STATUS_CONFIG, STATUS_ORDER, UserAvatar } from './JiraPrimitives.jsx';
+import { IssueStatus, IssueType, SprintStatus } from '../types/arij.js';
+import { STATUS_CONFIG, STATUS_ORDER, UserAvatar } from './ArijPrimitives.jsx';
 
 export const ReportsView = ({
   project,

@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="100%" height="100%">
+  <defs>
+    <!-- Left main ribbon of the A: bright sky blue at top apex to royal blue at bottom-left -->
+    <linearGradient id="arijLeftLeg" x1="55%" y1="12%" x2="22%" y2="62%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00B2FF" />
+      <stop offset="45%" stop-color="#0068FF" />
+      <stop offset="100%" stop-color="#003CE6" />
+    </linearGradient>
+
+    <!-- Upper right leg tucked under the fold -->
+    <linearGradient id="arijRightUpper" x1="54%" y1="16%" x2="66%" y2="38%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#011258" />
+      <stop offset="45%" stop-color="#08209A" />
+      <stop offset="100%" stop-color="#1E15C8" />
+    </linearGradient>
+
+    <!-- Lower right leg below the arrow -->
+    <linearGradient id="arijRightLower" x1="62%" y1="44%" x2="78%" y2="62%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#061980" />
+      <stop offset="40%" stop-color="#1D12C4" />
+      <stop offset="100%" stop-color="#3E08E6" />
+    </linearGradient>
+
+    <!-- Rising zig-zag arrow crossbar -->
+    <linearGradient id="arijArrow" x1="45%" y1="50%" x2="77%" y2="34%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0038DF" />
+      <stop offset="45%" stop-color="#0072FF" />
+      <stop offset="100%" stop-color="#00BCFF" />
+    </linearGradient>
+
+    <!-- Subtle drop shadow for 3D ribbon depth -->
+    <filter id="arijShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#001858" flood-opacity="0.18" />
+    </filter>
+  </defs>
+
+  <!-- White rounded background tile -->
+  <rect width="1000" height="1000" rx="160" fill="#FFFFFF" />
+
+  <!-- ==================== "A" 3D RIBBON + ARROW EMBLEM ==================== -->
+  <g filter="url(#arijShadow)">
+    <!-- 1. Upper-Right Leg (tucked behind the apex and cut above the arrow) -->
+    <path
+      d="M 520 145
+         L 622 172
+         L 696 312
+         C 672 315, 650 324, 642 344
+         L 584 386
+         L 504 238
+         Z"
+      fill="url(#arijRightUpper)"
+    />
+
+    <!-- 2. Lower-Right Leg (emerging from below the arrow down to bottom-right foot) -->
+    <path
+      d="M 605 492
+         L 702 426
+         L 794 590
+         C 804 608, 792 624, 770 624
+         L 716 624
+         C 686 624, 666 606, 652 580
+         Z"
+      fill="url(#arijRightLower)"
+    />
+
+    <!-- 3. Rising Zig-Zag Trend Arrow (Crossbar of the A) -->
+    <path
+      d="M 436 452
+         L 500 414
+         C 512 407, 524 409, 534 418
+         L 568 446
+         L 682 366
+         L 670 348
+         C 664 339, 670 330, 682 329
+         L 754 325
+         C 766 325, 772 334, 767 345
+         L 730 426
+         C 725 436, 714 438, 707 428
+         L 696 413
+         L 578 518
+         C 564 530, 548 530, 533 517
+         L 474 468
+         L 442 465
+         Z"
+      fill="url(#arijArrow)"
+    />
+
+    <!-- 4. Left Main Ribbon Leg of the A (overlaps the apex and left side) -->
+    <path
+      d="M 442 166
+         C 454 144, 474 134, 502 134
+         L 554 134
+         C 582 134, 606 148, 622 172
+         L 632 188
+         C 614 180, 598 186, 586 208
+         L 396 574
+         C 378 608, 348 624, 308 624
+         L 234 624
+         C 210 624, 198 606, 210 584
+         Z"
+      fill="url(#arijLeftLeg)"
+    />
+  </g>
+
+  <!-- ==================== "arij" GEOMETRIC NAVY WORDMARK ==================== -->
+  <g fill="#00205B">
+    <!-- Letter 'a': geometric circle bowl + right stem -->
+    <path
+      fill-rule="evenodd"
+      clip-rule="evenodd"
+      d="M 346 694
+         C 284 694, 244 738, 244 794
+         C 244 850, 284 894, 344 894
+         C 372 894, 394 882, 405 866
+         L 405 888
+         L 456 888
+         L 456 700
+         L 405 700
+         L 405 722
+         C 394 705, 372 694, 346 694
+         Z
+         M 350 742
+         C 382 742, 404 764, 404 794
+         C 404 824, 382 846, 350 846
+         C 318 846, 296 824, 296 794
+         C 296 764, 318 742, 350 742
+         Z"
+    />
+
+    <!-- Letter 'r': vertical stem + curved top-right shoulder -->
+    <path
+      d="M 482 888
+         L 482 792
+         C 482 732, 518 696, 578 696
+         L 602 696
+         L 602 748
+         L 576 748
+         C 548 748, 534 763, 534 794
+         L 534 888
+         Z"
+    />
+
+    <!-- Letter 'i': stem + circular dot -->
+    <rect x="622" y="700" width="52" height="188" />
+    <circle cx="648" cy="656" r="28" />
+
+    <!-- Letter 'j': stem curving down-left into descender + circular dot -->
+    <path
+      d="M 698 700
+         L 750 700
+         L 750 874
+         C 750 934, 716 966, 656 966
+         L 644 966
+         L 644 916
+         L 656 916
+         C 684 916, 698 902, 698 874
+         Z"
+    />
+    <circle cx="724" cy="656" r="28" />
+  </g>
+</svg>

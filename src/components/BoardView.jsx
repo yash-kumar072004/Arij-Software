@@ -18,7 +18,7 @@ import {
   IssuePriority,
   IssueStatus,
   IssueType,
-} from '../types/jira.js';
+} from '../types/arij.js';
 import {
   formatShortDate,
   isOverdue,
@@ -29,7 +29,7 @@ import {
   STATUS_CONFIG,
   STATUS_ORDER,
   UserAvatar,
-} from './JiraPrimitives.jsx';
+} from './ArijPrimitives.jsx';
 
 export const BoardView = ({
   project,
@@ -46,10 +46,10 @@ export const BoardView = ({
   onNavigateToBacklog,
 }) => {
   // User Page-Wise & Center-Line Split State:
-  // - If 1 user is selected -> shows ONLY that user's 5-column Jira board (page-wise)
-  // - If 2+ users are selected -> shows User 1's 5-column Jira board above,
+  // - If 1 user is selected -> shows ONLY that user's 5-column Arij board (page-wise)
+  // - If 2+ users are selected -> shows User 1's 5-column Arij board above,
   //   a Center Line in the middle with a "Show Down / Hide Below" button,
-  //   and User 2's 5-column Jira board below the Center Line!
+  //   and User 2's 5-column Arij board below the Center Line!
   const [selectedUserIds, setSelectedUserIds] = useState(() => {
     const firstId = users[0]?.id || currentUserId;
     const secondId = users[1]?.id;
@@ -59,7 +59,7 @@ export const BoardView = ({
   // Controls whether each user section below a center line is expanded ("showing down") or collapsed ("or not")
   const [showBelowUserMap, setShowBelowUserMap] = useState({});
 
-  // Standard Jira Board Filters (Search, Issue Type: Story/Task/Bug, Epic, Priority)
+  // Standard Arij Board Filters (Search, Issue Type: Story/Task/Bug, Epic, Priority)
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEpicId, setSelectedEpicId] = useState(null);
   const [selectedType, setSelectedType] = useState('ALL');
@@ -132,7 +132,7 @@ export const BoardView = ({
     highPriorityOnly,
   ]);
 
-  // Count by Jira Issue Type for Jira Type Filter pills
+  // Count by Arij Issue Type for Type Filter pills
   const typeCounts = useMemo(() => {
     return {
       ALL: boardBaseIssues.length,
@@ -242,7 +242,7 @@ export const BoardView = ({
     setHighPriorityOnly(false);
   };
 
-  // Render an authentic Jira Issue Card inside the 5-column Kanban board
+  // Render an authentic Arij Issue Card inside the 5-column Kanban board
   const renderIssueCard = (issue) => {
     const assignee = issue.assigneeId ? userMap[issue.assigneeId] : null;
     const parentEpic = issue.epicId ? epicMap[issue.epicId] : null;
@@ -265,7 +265,7 @@ export const BoardView = ({
           draggedIssueId === issue.id ? 'opacity-40 scale-[0.98]' : ''
         }`}
       >
-        {/* Row 1: Jira Issue Type Badge + Monospace Issue Key + Due Date */}
+        {/* Row 1: Arij Issue Type Badge + Monospace Issue Key + Due Date */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span
@@ -295,7 +295,7 @@ export const BoardView = ({
           {issue.title}
         </h4>
 
-        {/* Row 3: Jira Epic Lozenge, Labels & Subtask Progress */}
+        {/* Row 3: Arij Epic Lozenge, Labels & Subtask Progress */}
         {(parentEpic || totalSubtasks > 0 || (issue.labels && issue.labels.length > 0)) && (
           <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] pt-0.5">
             <div className="flex flex-wrap items-center gap-1 min-w-0">
@@ -322,7 +322,7 @@ export const BoardView = ({
           </div>
         )}
 
-        {/* Row 4: Jira Card Footer (Priority Icon + Story Points + Comments + Quick Status + Assignee Avatar) */}
+        {/* Row 4: Arij Card Footer (Priority Icon + Story Points + Comments + Quick Status + Assignee Avatar) */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-100">
           <div className="flex items-center gap-2">
             <span
@@ -394,7 +394,7 @@ export const BoardView = ({
     return resolved.length > 0 ? resolved : users.slice(0, 1);
   }, [selectedUserIds, users, unassignedUserObj]);
 
-  // Render the classic Jira 5-Column Kanban Board (TO DO, IN PROGRESS, IN REVIEW, QA TESTING, DONE) for a specific User
+  // Render the classic Arij 5-Column Kanban Board (TO DO, IN PROGRESS, IN REVIEW, QA TESTING, DONE) for a specific User
   const renderUserFiveColumnBoard = (userObj) => {
     const userIssues = filteredIssues.filter((i) =>
       userObj.id === 'UNASSIGNED'
@@ -425,7 +425,7 @@ export const BoardView = ({
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-sm font-bold text-white">
-                  {userObj.name}&rsquo;s Jira Board
+                  {userObj.name}&rsquo;s Arij Board
                 </h2>
                 <span className="text-[11px] px-2 py-0.5 rounded bg-blue-600/30 border border-blue-400/30 text-blue-200 font-semibold">
                   {userObj.role}
@@ -454,7 +454,7 @@ export const BoardView = ({
           </div>
         </div>
 
-        {/* Classic 5-Column Jira Kanban Grid (TO DO | IN PROGRESS | IN REVIEW | QA TESTING | DONE) */}
+        {/* Classic 5-Column Arij Kanban Grid (TO DO | IN PROGRESS | IN REVIEW | QA TESTING | DONE) */}
         <div className="p-4 overflow-x-auto bg-slate-50">
           <div className="grid grid-cols-5 gap-4 min-w-[1080px]">
             {STATUS_ORDER.map((status) => {
@@ -685,9 +685,9 @@ export const BoardView = ({
         </div>
 
         {/* ====================================================================
-            JIRA ASSIGNEE / USER SELECTOR BAR (PAGE-WISE & CENTER-LINE SPLIT)
-            - Click 1 User ("Only") -> shows ONLY that user's 5-column Jira board
-            - Click 2+ Users -> shows both users' 5-column Jira boards separated by a
+            ARIJ ASSIGNEE / USER SELECTOR BAR (PAGE-WISE & CENTER-LINE SPLIT)
+            - Click 1 User ("Only") -> shows ONLY that user's 5-column Arij board
+            - Click 2+ Users -> shows both users' 5-column Arij boards separated by a
               Center Line in the middle with a Show Down / Hide Below button!
            ==================================================================== */}
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col gap-2.5">
@@ -695,7 +695,7 @@ export const BoardView = ({
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-600" />
               <span className="text-xs font-bold text-slate-900">
-                Jira User Swimlanes (Page-Wise & Center-Line Split):
+                Arij User Swimlanes (Page-Wise &amp; Center-Line Split):
               </span>
               <span className="text-xs text-slate-500">
                 Click <strong>1 user</strong> to view only their 5-column board, or click{' '}
@@ -830,7 +830,7 @@ export const BoardView = ({
         </div>
 
         {/* ====================================================================
-            JIRA ISSUE TYPES & FILTER TOOLBAR (All Types, Story, Task, Bug, Epic, Search)
+            ARIJ ISSUE TYPES & FILTER TOOLBAR (All Types, Story, Task, Bug, Epic, Search)
            ==================================================================== */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -841,7 +841,7 @@ export const BoardView = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search Jira key, title, label..."
+                placeholder="Search Arij key, title, label..."
                 className="pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white w-52"
               />
               {searchQuery && (
@@ -855,7 +855,7 @@ export const BoardView = ({
               )}
             </div>
 
-            {/* Jira Issue Type Filter Buttons (All, Story, Task, Bug) */}
+            {/* Arij Issue Type Filter Buttons (All, Story, Task, Bug) */}
             <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
               <button
                 type="button"
@@ -1024,7 +1024,7 @@ export const BoardView = ({
                   </div>
                 )}
 
-                {/* User's 5-Column Jira Kanban Board */}
+                {/* User's 5-Column Arij Kanban Board */}
                 {(!isBelowCenterLine || isShowingDown) &&
                   renderUserFiveColumnBoard(userObj)}
               </React.Fragment>

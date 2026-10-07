@@ -18,14 +18,14 @@ import {
   IssuePriority,
   IssueStatus,
   IssueType,
-} from '../types/jira.js';
+} from '../types/arij.js';
 import {
   IssueTypeIcon,
   PRIORITY_CONFIG,
   PriorityIcon,
   STATUS_CONFIG,
   STATUS_ORDER,
-} from './JiraPrimitives.jsx';
+} from './ArijPrimitives.jsx';
 
 export const ScreenshotImporterModal = ({
   activeProject,
@@ -97,7 +97,7 @@ export const ScreenshotImporterModal = ({
     setError(null);
 
     try {
-      const response = await fetch('/api/jira/extract-screenshot', {
+      const response = await fetch('/api/arij/extract-screenshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

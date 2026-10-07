@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Plus, Settings, ShieldAlert, Users } from 'lucide-react';
-import { STATUS_CONFIG, STATUS_ORDER, UserAvatar } from './JiraPrimitives.jsx';
+import { STATUS_CONFIG, STATUS_ORDER, UserAvatar } from './ArijPrimitives.jsx';
 
 export const ProjectSettingsView = ({
   project,

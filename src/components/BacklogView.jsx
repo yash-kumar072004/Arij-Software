@@ -14,7 +14,7 @@ import {
   IssueStatus,
   IssueType,
   SprintStatus,
-} from '../types/jira.js';
+} from '../types/arij.js';
 import {
   formatShortDate,
   IssueTypeIcon,
@@ -23,7 +23,7 @@ import {
   STATUS_CONFIG,
   STATUS_ORDER,
   UserAvatar,
-} from './JiraPrimitives.jsx';
+} from './ArijPrimitives.jsx';
 
 export const BacklogView = ({
   project,

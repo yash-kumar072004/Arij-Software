@@ -12,7 +12,7 @@ import {
   IssuePriority,
   IssueStatus,
   IssueType,
-} from '../types/jira.js';
+} from '../types/arij.js';
 import {
   formatShortDate,
   isOverdue,
@@ -23,7 +23,7 @@ import {
   STATUS_ORDER,
   TYPE_CONFIG,
   UserAvatar,
-} from './JiraPrimitives.jsx';
+} from './ArijPrimitives.jsx';
 
 export const IssuesNavigatorView = ({
   project,
@@ -292,7 +292,7 @@ export const IssuesNavigatorView = ({
               <span>{project.name}</span>
               <span>/</span>
               <span className="font-semibold text-slate-700">
-                Issue Navigator & Advanced JQL Search
+                Issue Navigator &amp; Advanced AQL Search
               </span>
             </div>
             <h1 className="text-lg font-bold text-slate-900 tracking-tight mt-0.5">
@@ -381,7 +381,7 @@ export const IssuesNavigatorView = ({
             {queryMode === 'BASIC' ? (
               <>
                 <Code2 className="w-3.5 h-3.5" />
-                Switch to JQL
+                Switch to AQL
               </>
             ) : (
               <>
@@ -422,11 +422,11 @@ export const IssuesNavigatorView = ({
           </form>
         )}
 
-        {/* Query Bar: Either Basic Selectors OR JQL Input */}
+        {/* Query Bar: Either Basic Selectors OR AQL Input */}
         {queryMode === 'JQL' ? (
           <div className="flex items-center gap-2">
             <div className="px-2.5 py-1.5 bg-slate-900 text-emerald-400 font-mono text-xs font-bold rounded-l-md">
-              JQL
+              AQL
             </div>
             <input
               type="text"

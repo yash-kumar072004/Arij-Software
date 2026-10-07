@@ -17,7 +17,7 @@ import {
   IssuePriority,
   IssueStatus,
   IssueType,
-} from '../types/jira.js';
+} from '../types/arij.js';
 import {
   formatShortDate,
   isOverdue,
@@ -27,7 +27,7 @@ import {
   STATUS_CONFIG,
   STATUS_ORDER,
   UserAvatar,
-} from './JiraPrimitives.jsx';
+} from './ArijPrimitives.jsx';
 
 export const MyWorkspaceView = ({
   currentUser,
@@ -172,7 +172,7 @@ export const MyWorkspaceView = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-white">
-                  {userObj.name}&rsquo;s Personal 5-Column Jira Board
+                  {userObj.name}&rsquo;s Personal 5-Column Arij Board
                 </h2>
                 <span className="text-[11px] px-2 py-0.5 rounded bg-blue-600/30 border border-blue-400/30 text-blue-200 font-semibold">
                   {userObj.role}
@@ -196,7 +196,7 @@ export const MyWorkspaceView = ({
           )}
         </div>
 
-        {/* Classic 5-Column Jira System (TO DO | IN PROGRESS | IN REVIEW | QA TESTING | DONE) */}
+        {/* Classic 5-Column Arij System (TO DO | IN PROGRESS | IN REVIEW | QA TESTING | DONE) */}
         <div className="p-4 overflow-x-auto bg-slate-50">
           <div className="grid grid-cols-5 gap-4 min-w-[1080px]">
             {STATUS_ORDER.map((status) => {
@@ -410,13 +410,13 @@ export const MyWorkspaceView = ({
               <span>{currentUser.email}</span>
             </div>
             <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-              Every User&rsquo;s Own 5-Column Jira Board
+              Every User&rsquo;s Own 5-Column Arij Board
             </h1>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5">
-          {/* Jira Issue Type Filter */}
+          {/* Arij Issue Type Filter */}
           <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
             <button
               type="button"
