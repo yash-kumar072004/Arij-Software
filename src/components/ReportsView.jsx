@@ -27,15 +27,14 @@ export const ReportsView = ({
   const nonEpicIssues = useMemo(
     () =>
       issues.filter(
-        (i) => i.type !== IssueType.EPIC && i.type !== IssueType.SUBTASK
+        (i) => i.type !== IssueType.EPIC || !String(i.id).startsWith('iss-epic-')
       ),
     [issues]
   );
 
   const sprintIssues = useMemo(() => {
-    if (!activeSprint) return nonEpicIssues;
-    return nonEpicIssues.filter((i) => i.sprintId === activeSprint.id);
-  }, [nonEpicIssues, activeSprint]);
+    return nonEpicIssues;
+  }, [nonEpicIssues]);
 
   const kpis = useMemo(() => {
     const totalPoints = sprintIssues.reduce(

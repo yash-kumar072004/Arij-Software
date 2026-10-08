@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Calendar,
   CheckSquare,
@@ -51,6 +51,37 @@ export const MyWorkspaceView = ({
   });
   const [showBelowUserMap, setShowBelowUserMap] = useState({});
   const [selectedType, setSelectedType] = useState('ALL');
+  const prevIssuesCountRef = useRef(allIssues.length);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      setSelectedUserIds((prev) => [
+        currentUser.id,
+        ...prev.filter((id) => id !== currentUser.id),
+      ]);
+      setShowBelowUserMap((m) => ({ ...m, [currentUser.id]: true }));
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (allIssues.length > prevIssuesCountRef.current) {
+      const latest =
+        allIssues.find((i) => i.isUserCreated) ||
+        allIssues[0] ||
+        allIssues[allIssues.length - 1];
+      if (latest?.assigneeId) {
+        setSelectedUserIds((prev) => [
+          latest.assigneeId,
+          ...prev.filter((id) => id !== latest.assigneeId),
+        ]);
+        setShowBelowUserMap((m) => ({ ...m, [latest.assigneeId]: true }));
+      }
+      if (selectedType !== 'ALL' && latest && latest.type !== selectedType) {
+        setSelectedType('ALL');
+      }
+    }
+    prevIssuesCountRef.current = allIssues.length;
+  }, [allIssues, selectedType]);
 
   // Drag & Drop State across columns & users
   const [draggedIssueId, setDraggedIssueId] = useState(null);
@@ -151,14 +182,18 @@ export const MyWorkspaceView = ({
   const nonEpicIssues = useMemo(() => {
     return allIssues.filter(
       (i) =>
-        i.type !== IssueType.EPIC &&
-        i.type !== IssueType.SUBTASK &&
+        (i.type !== IssueType.EPIC || !String(i.id).startsWith('iss-epic-')) &&
         (selectedType === 'ALL' || i.type === selectedType)
     );
   }, [allIssues, selectedType]);
 
-  const renderUserFiveColumnBoard = (userObj) => {
-    const userIssues = nonEpicIssues.filter((i) => i.assigneeId === userObj.id);
+  const renderUserFiveColumnBoard = (userObj, isTopBoard = false) => {
+    const userIssues = nonEpicIssues.filter(
+      (i) =>
+        i.assigneeId === userObj.id ||
+        (isTopBoard && i.isUserCreated) ||
+        (i.isUserCreated && i.reporterId === userObj.id)
+    );
     const totalPts = userIssues.reduce((s, i) => s + (i.storyPoints || 0), 0);
     const donePts = userIssues
       .filter((i) => i.status === IssueStatus.DONE)
@@ -645,7 +680,7 @@ export const MyWorkspaceView = ({
                 )}
 
                 {(!isBelowCenterLine || isShowingDown) &&
-                  renderUserFiveColumnBoard(userObj)}
+                  renderUserFiveColumnBoard(userObj, idx === 0)}
               </React.Fragment>
             );
           })}

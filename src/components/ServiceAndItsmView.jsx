@@ -30,7 +30,9 @@ export const ServiceAndItsmView = ({
   const [selectedQueue, setSelectedQueue] = useState('ALL_OPEN');
 
   const queueIssues = issues.filter((iss) => {
-    if (iss.type === IssueType.EPIC) return false;
+    if (iss.type === IssueType.EPIC && String(iss.id).startsWith('iss-epic-')) {
+      return false;
+    }
     if (selectedQueue === 'UNASSIGNED') return !iss.assigneeId;
     if (selectedQueue === 'HIGH_PRIORITY') {
       return (
@@ -41,7 +43,7 @@ export const ServiceAndItsmView = ({
     if (selectedQueue === 'BUGS_INCIDENTS') {
       return iss.type === IssueType.BUG || iss.type === IssueType.INCIDENT;
     }
-    return iss.status !== IssueStatus.DONE;
+    return true;
   });
 
   // ==================== 2. MAJOR INCIDENT MANAGEMENT (Section 24) ====================

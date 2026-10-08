@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Calendar,
@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Eye,
   EyeOff,
+  FileText,
   Layers,
   MessageSquare,
   Plus,
@@ -43,6 +44,7 @@ export const BoardView = ({
   onQuickCreateIssue,
   onOpenCompleteSprintModal,
   onOpenScreenshotImporter,
+  onOpenStoryPdfImporter,
   onNavigateToBacklog,
 }) => {
   // User Page-Wise & Center-Line Split State:
@@ -51,9 +53,11 @@ export const BoardView = ({
   //   a Center Line in the middle with a "Show Down / Hide Below" button,
   //   and User 2's 5-column Arij board below the Center Line!
   const [selectedUserIds, setSelectedUserIds] = useState(() => {
-    const firstId = users[0]?.id || currentUserId;
-    const secondId = users[1]?.id;
-    return secondId && secondId !== firstId ? [firstId, secondId] : [firstId];
+    const allIds = users.map((u) => u.id);
+    if (currentUserId && !allIds.includes(currentUserId)) {
+      allIds.unshift(currentUserId);
+    }
+    return allIds.length > 0 ? allIds : [currentUserId];
   });
 
   // Controls whether each user section below a center line is expanded ("showing down") or collapsed ("or not")
@@ -64,6 +68,47 @@ export const BoardView = ({
   const [selectedEpicId, setSelectedEpicId] = useState(null);
   const [selectedType, setSelectedType] = useState('ALL');
   const [highPriorityOnly, setHighPriorityOnly] = useState(false);
+
+  const prevIssuesCountRef = useRef(issues.length);
+
+  // Automatically ensure currentUserId and any newly created issue's assignee (e.g. when a friend creates a story) are visible at the top of the board
+  useEffect(() => {
+    if (currentUserId) {
+      setSelectedUserIds((prev) => [
+        currentUserId,
+        ...prev.filter((id) => id !== currentUserId),
+      ]);
+      setShowBelowUserMap((m) => ({ ...m, [currentUserId]: true }));
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (issues.length > prevIssuesCountRef.current) {
+      const latestIssue =
+        issues.find((i) => i.isUserCreated) || issues[0] || issues[issues.length - 1];
+      if (latestIssue) {
+        const targetId = latestIssue.assigneeId || 'UNASSIGNED';
+        setSelectedUserIds((prev) => [
+          targetId,
+          ...prev.filter((id) => id !== targetId),
+        ]);
+        setShowBelowUserMap((m) => ({ ...m, [targetId]: true }));
+        if (selectedType !== 'ALL' && latestIssue.type !== selectedType) {
+          setSelectedType('ALL');
+        }
+        if (selectedEpicId && latestIssue.epicId !== selectedEpicId) {
+          setSelectedEpicId(null);
+        }
+        if (searchQuery) {
+          setSearchQuery('');
+        }
+        if (highPriorityOnly) {
+          setHighPriorityOnly(false);
+        }
+      }
+    }
+    prevIssuesCountRef.current = issues.length;
+  }, [issues, selectedType, selectedEpicId, searchQuery, highPriorityOnly]);
 
   // Drag & Drop State (tracks issueId and target user + status column)
   const [draggedIssueId, setDraggedIssueId] = useState(null);
@@ -91,17 +136,12 @@ export const BoardView = ({
     return map;
   }, [epics]);
 
-  // Base issues for the board (Scrum active sprint or Kanban continuous flow)
+  // Base issues for the board — show all project work items (including planned sprints and user-created epics) so newly created issues are always visible
   const boardBaseIssues = useMemo(() => {
-    const nonEpics = issues.filter(
-      (i) => i.type !== IssueType.EPIC && i.type !== IssueType.SUBTASK
+    return issues.filter(
+      (i) => i.type !== IssueType.EPIC || !String(i.id).startsWith('iss-epic-')
     );
-    if (project.template === 'Kanban') {
-      return nonEpics;
-    }
-    if (!activeSprint) return [];
-    return nonEpics.filter((i) => i.sprintId === activeSprint.id);
-  }, [issues, project.template, activeSprint]);
+  }, [issues]);
 
   // Filtered board issues (before splitting by user)
   const filteredIssues = useMemo(() => {
@@ -395,12 +435,20 @@ export const BoardView = ({
   }, [selectedUserIds, users, unassignedUserObj]);
 
   // Render the classic Arij 5-Column Kanban Board (TO DO, IN PROGRESS, IN REVIEW, QA TESTING, DONE) for a specific User
-  const renderUserFiveColumnBoard = (userObj) => {
-    const userIssues = filteredIssues.filter((i) =>
-      userObj.id === 'UNASSIGNED'
-        ? !i.assigneeId
-        : i.assigneeId === userObj.id
-    );
+  const renderUserFiveColumnBoard = (userObj, isTopBoard = false) => {
+    const userIssues = filteredIssues.filter((i) => {
+      if (userObj.id === 'UNASSIGNED') {
+        return !i.assigneeId;
+      }
+      if (i.assigneeId === userObj.id) {
+        return true;
+      }
+      // Always surface newly created stories on the top board so stories created by you or a friend are immediately visible
+      if (isTopBoard && i.isUserCreated) {
+        return true;
+      }
+      return false;
+    });
     const userTotalPts = userIssues.reduce(
       (s, i) => s + (i.storyPoints || 0),
       0
@@ -662,6 +710,17 @@ export const BoardView = ({
                 />
               </div>
             </div>
+
+            {onOpenStoryPdfImporter && (
+              <button
+                type="button"
+                onClick={onOpenStoryPdfImporter}
+                className="px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                Upload Story PDF
+              </button>
+            )}
 
             <button
               type="button"
@@ -1026,7 +1085,7 @@ export const BoardView = ({
 
                 {/* User's 5-Column Arij Kanban Board */}
                 {(!isBelowCenterLine || isShowingDown) &&
-                  renderUserFiveColumnBoard(userObj)}
+                  renderUserFiveColumnBoard(userObj, idx === 0)}
               </React.Fragment>
             );
           })}

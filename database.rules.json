@@ -1,0 +1,9 @@
+{
+  "rules": {
+    "arij_shared_workspace": {
+      ".read": true,
+      ".write": "newData.exists() && newData.child('workspace').exists()",
+      ".validate": "newData.hasChildren(['workspace', 'updatedAt'])"
+    }
+  }
+}

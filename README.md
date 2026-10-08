@@ -1,27 +1,22 @@
-# Jira — Agile Project Management & Issue Tracking (React + JavaScript)
+# Arij — Agile Project Management & Issue Tracking (React + JavaScript)
 
-Full-featured Agile project management and issue tracking application built with React 19, TypeScript, Tailwind CSS, Express, and `@google/genai` multimodal screenshot extraction.
+Full-featured Agile project management and issue tracking application built with React 19, JavaScript (ES Modules), Tailwind CSS, Express, and `@google/genai` multimodal Screenshot & Story PDF extraction.
 
 ## Features
 
-- **Screenshot-to-Jira Importer**: Upload or paste screenshots (`Ctrl+V` / `Cmd+V`) of an existing Jira board, backlog, or issue list to automatically detect and create team member profiles, epics, sprints, stories, tasks, and bugs with their exact statuses, story points, and profile assignments.
+- **Story PDF Auto-Extractor**: Upload any User Story or PRD `.pdf` document in the **Create Issue** modal or the **Upload Story PDF** importer to automatically populate `Title / Summary`, `Description & Acceptance Criteria`, `Issue Type`, `Priority`, `Story Points`, `Time Estimate`, `Due Date`, `Labels`, and `Subtasks`.
+- **Screenshot-to-Arij Importer**: Upload or paste screenshots (`Ctrl+V` / `Cmd+V`) of an existing board, backlog, or issue list to automatically detect and create team member profiles, epics, sprints, stories, tasks, and bugs with their exact statuses, story points, and profile assignments.
+- **Per-User Personal Workspace & Center-Line Split View**:
+  - Every user has their own isolated personal project, scratchpad, and 5-column Kanban/Scrum board (`To Do`, `In Progress`, `In Review`, `QA Testing`, `Done`).
+  - Select two or more users to compare boards with a horizontal **Center Line** and interactive **Show Down / Hide Below** toggle button.
 - **Active Sprint & Kanban Board**:
-  - 5-stage workflow (`To Do`, `In Progress`, `In Review`, `QA Testing`, `Done`) with drag-and-drop and column WIP limits.
+  - 5-stage workflow with drag-and-drop and column WIP limits.
   - Swimlane grouping (`None`, `Epic`, `Assignee`, `Priority`).
   - Multi-facet filtering (Search, Assignee avatars, `Only My Issues`, Epic, Issue Type, Priority).
-- **Scrum Backlog & Sprint Planning**:
-  - Collapsible sprint containers and backlog planning with story point summaries.
-  - Epics side panel with completion progress bars.
-  - Start Sprint & Complete Sprint workflows with automatic rollover of incomplete issues.
-- **Timeline / Epic Roadmap (Gantt View)**:
-  - Interactive timeline plotting Epics and child issues across weeks.
-- **Issue Navigator & JQL Search**:
-  - Basic Filter Builder and live **JQL (Jira Query Language)** mode.
-  - High-density List View, Detail Split View, custom saved filters, and CSV Export.
-- **Agile Reports & Analytics**:
-  - Sprint Burndown Chart, Velocity Chart, and Team Workload distribution.
-- **Releases, Components & Project Settings**:
-  - Version tracking, architectural components, multi-project workspace switcher, and WIP limit configuration.
+- **Scrum Backlog, Roadmap, Dashboards, OKRs, RICE, Automation, ITSM & AI Assistant**:
+  - Complete 5-pillar enterprise work management (`PLAN · BUILD · TRACK · AUTOMATE · AI`).
+- **Issue Navigator & AQL Search**:
+  - Basic Filter Builder and live **AQL (Arij Query Language)** mode with CSV & JSON Export.
 
 ## Getting Started
 

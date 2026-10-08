@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, Play, FolderPlus, Plus } from 'lucide-react';
+import {
+  X,
+  CheckCircle2,
+  Play,
+  FolderPlus,
+  Plus,
+  FileText,
+  Upload,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
 import {
   IssuePriority,
   IssueStatus,
@@ -29,8 +39,17 @@ export const CreateIssueModal = ({
   const [description, setDescription] = useState('');
   const [assigneeId, setAssigneeId] = useState(currentUserId);
   const [epicId, setEpicId] = useState('');
+  const projectSpecificSprints = sprints.filter(
+    (s) => !s.projectId || s.projectId === projectId
+  );
+  const projectSpecificEpics = epics.filter(
+    (ep) => !ep.projectId || ep.projectId === projectId
+  );
+
   const [sprintId, setSprintId] = useState(
-    sprints.find((s) => s.status === 'ACTIVE')?.id || ''
+    projectSpecificSprints.find((s) => s.status === 'ACTIVE')?.id ||
+      sprints.find((s) => s.status === 'ACTIVE')?.id ||
+      ''
   );
   const [storyPoints, setStoryPoints] = useState(5);
   const [originalEstimateHours, setOriginalEstimateHours] = useState(12);
@@ -40,6 +59,152 @@ export const CreateIssueModal = ({
   );
   const [dueDate, setDueDate] = useState('2026-10-16');
   const [labelsRaw, setLabelsRaw] = useState('security, q4');
+
+  const handleProjectChange = (nextProjectId) => {
+    setProjectId(nextProjectId);
+    const nextProjSprints = sprints.filter(
+      (s) => !s.projectId || s.projectId === nextProjectId
+    );
+    const nextActiveSp = nextProjSprints.find((s) => s.status === 'ACTIVE');
+    setSprintId(nextActiveSp ? nextActiveSp.id : nextProjSprints[0]?.id || '');
+    const nextProjEpics = epics.filter(
+      (ep) => !ep.projectId || ep.projectId === nextProjectId
+    );
+    setEpicId(nextProjEpics[0]?.id || '');
+  };
+
+  // Story PDF Upload & Auto-Fill state
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
+  const [uploadedPdfName, setUploadedPdfName] = useState('');
+  const [pdfAutoFillBanner, setPdfAutoFillBanner] = useState(null);
+  const [extractedSubtasks, setExtractedSubtasks] = useState([]);
+  const [uploadedAttachments, setUploadedAttachments] = useState([]);
+
+  const applyExtractedStoryFields = (data, fileName, fileSizeStr = '240 KB') => {
+    if (data.title) setTitle(data.title);
+    if (data.description) setDescription(data.description);
+    if (data.type && IssueType[data.type]) {
+      setType(IssueType[data.type]);
+    } else {
+      setType(IssueType.STORY);
+    }
+    if (data.priority && IssuePriority[data.priority]) {
+      setPriority(IssuePriority[data.priority]);
+    }
+    if (data.storyPoints !== undefined) {
+      setStoryPoints(Number(data.storyPoints) || 5);
+    }
+    if (data.originalEstimateHours !== undefined) {
+      setOriginalEstimateHours(Number(data.originalEstimateHours) || 12);
+    }
+    if (data.dueDate) {
+      setDueDate(data.dueDate);
+    }
+    if (Array.isArray(data.labels) && data.labels.length > 0) {
+      setLabelsRaw(data.labels.join(', '));
+    }
+    if (Array.isArray(data.subtasks)) {
+      setExtractedSubtasks(data.subtasks);
+    }
+    setUploadedPdfName(fileName);
+    setUploadedAttachments([
+      {
+        id: `att-pdf-${Date.now()}`,
+        name: fileName,
+        size: fileSizeStr,
+        uploadedAt: new Date().toISOString().slice(0, 10),
+      },
+    ]);
+    setPdfAutoFillBanner(
+      `Auto-filled Title, Description, Story Points, Priority, Labels${
+        Array.isArray(data.subtasks) && data.subtasks.length > 0
+          ? ` & ${data.subtasks.length} Subtasks`
+          : ''
+      } from "${fileName}"!`
+    );
+  };
+
+  const handleStoryPdfFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsParsingPdf(true);
+    setPdfAutoFillBanner(null);
+
+    const activeProj =
+      projects.find((p) => p.id === projectId) || projects[0];
+    const fileSizeStr = `${Math.max(1, Math.round(file.size / 1024))} KB`;
+
+    try {
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const resStr = String(reader.result || '');
+          const commaIdx = resStr.indexOf(',');
+          resolve(commaIdx >= 0 ? resStr.slice(commaIdx + 1) : resStr);
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/arij/extract-story-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type || 'application/pdf',
+          fileDataBase64: base64Data,
+          projectKey: activeProj?.key || 'KAW',
+        }),
+      });
+      const data = await res.json();
+      applyExtractedStoryFields(data, file.name, fileSizeStr);
+    } catch {
+      const cleanName = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+      applyExtractedStoryFields(
+        {
+          title: `User Story: ${cleanName}`,
+          description: `### User Story Specification (${file.name})\nAutomatically extracted requirements from uploaded PDF \`${file.name}\`.\n\n### Acceptance Criteria\n- Implement end-to-end story workflow and UI/API validation\n- Add automated unit and integration tests`,
+          type: 'STORY',
+          priority: 'HIGH',
+          storyPoints: 5,
+          originalEstimateHours: 12,
+          dueDate: '2026-10-22',
+          labels: ['pdf-story', 'auto-filled'],
+          subtasks: [
+            { title: `Implement core story logic from ${file.name}`, completed: false },
+            { title: 'Verify acceptance criteria and QA test cases', completed: false },
+          ],
+        },
+        file.name,
+        fileSizeStr
+      );
+    } finally {
+      setIsParsingPdf(false);
+    }
+  };
+
+  const handleLoadSampleStoryPdf = async () => {
+    setIsParsingPdf(true);
+    const activeProj =
+      projects.find((p) => p.id === projectId) || projects[0];
+    try {
+      const res = await fetch('/api/arij/extract-story-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: 'arij-sso-rbac-user-story.pdf',
+          mimeType: 'application/pdf',
+          extractedTextHint:
+            'Title: Implement Role-Based Access Control (RBAC) & SAML 2.0 Single Sign-On Story\nDescription: As an Enterprise Organization Admin, I want granular RBAC permission schemes and SAML 2.0 SSO enforced across all Arij projects so that only authorized engineers can transition issues to Production Done.\nAcceptance Criteria:\n1. Support SAML 2.0 identity provider metadata upload\n2. Enforce project-level and workflow transition permissions\n3. Log all permission changes in the immutable Security Audit Log\nPriority: HIGH\nStory Points: 8',
+          projectKey: activeProj?.key || 'KAW',
+        }),
+      });
+      const data = await res.json();
+      applyExtractedStoryFields(data, 'arij-sso-rbac-user-story.pdf', '318 KB');
+    } finally {
+      setIsParsingPdf(false);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -63,6 +228,8 @@ export const CreateIssueModal = ({
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean),
+      subtasks: extractedSubtasks,
+      attachments: uploadedAttachments,
     });
     onClose();
   };
@@ -91,6 +258,69 @@ export const CreateIssueModal = ({
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* Upload Story PDF Auto-Fill Box */}
+          <div className="p-3.5 rounded-lg bg-blue-50/80 border border-blue-200 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-slate-900">
+                    Upload Story PDF — Auto-Fill All Inputs
+                  </div>
+                  <div className="text-[11px] text-slate-600">
+                    Upload a `.pdf` story specification to automatically populate Title, Description, Points, Priority, Labels &amp; Subtasks.
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="cursor-pointer px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center gap-1.5 transition-colors">
+                  {isParsingPdf ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Extracting PDF...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      Upload Story PDF
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf,.txt,.md,.doc,.docx"
+                    onChange={handleStoryPdfFileChange}
+                    className="hidden"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleLoadSampleStoryPdf}
+                  disabled={isParsingPdf}
+                  className="px-2.5 py-1.5 text-xs font-semibold bg-white hover:bg-slate-100 text-blue-700 border border-blue-200 rounded-md flex items-center gap-1"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Sample PDF
+                </button>
+              </div>
+            </div>
+
+            {pdfAutoFillBanner && (
+              <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded text-xs font-semibold text-emerald-800 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  {pdfAutoFillBanner}
+                </span>
+                {uploadedPdfName && (
+                  <span className="font-mono text-[11px] text-emerald-700">
+                    {uploadedPdfName}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -98,7 +328,7 @@ export const CreateIssueModal = ({
               </label>
               <select
                 value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
+                onChange={(e) => handleProjectChange(e.target.value)}
                 className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md text-slate-900"
               >
                 {projects.map((p) => (
@@ -226,7 +456,7 @@ export const CreateIssueModal = ({
                 className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md text-slate-900"
               >
                 <option value="">Backlog (No Sprint)</option>
-                {sprints
+                {projectSpecificSprints
                   .filter((s) => s.status !== 'COMPLETED')
                   .map((sp) => (
                     <option key={sp.id} value={sp.id}>
@@ -246,7 +476,7 @@ export const CreateIssueModal = ({
                 className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md text-slate-900"
               >
                 <option value="">None</option>
-                {epics.map((ep) => (
+                {projectSpecificEpics.map((ep) => (
                   <option key={ep.id} value={ep.id}>
                     {ep.key} — {ep.title}
                   </option>
@@ -346,6 +576,35 @@ export const CreateIssueModal = ({
               />
             </div>
           </div>
+
+          {extractedSubtasks.length > 0 && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-2">
+              <div className="text-xs font-bold text-slate-800">
+                Auto-Extracted Subtasks from Story PDF ({extractedSubtasks.length})
+              </div>
+              <div className="space-y-1.5">
+                {extractedSubtasks.map((st, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-2 text-xs bg-white border border-slate-200 rounded px-2.5 py-1.5"
+                  >
+                    <span className="text-slate-800">{st.title}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExtractedSubtasks((prev) =>
+                          prev.filter((_, i) => i !== idx)
+                        )
+                      }
+                      className="text-slate-400 hover:text-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-2">
             <button

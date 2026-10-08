@@ -1,0 +1,25 @@
+{
+  "plan": "SPARK_FREE_TIER_ONLY",
+  "billingRequired": false,
+  "enabled": true,
+  "provider": "firebase_spark_and_cloud_hub",
+  "projectId": "",
+  "apiKey": "",
+  "authDomain": "",
+  "databaseURL": "",
+  "storageBucket": "",
+  "appId": "",
+  "collectionName": "arij_shared_workspace",
+  "documentId": "main",
+  "remoteHubUrl": "https://ais-pre-7xgyqayxy5qqaqfqzqmoor-237735571835.asia-southeast1.run.app",
+  "githubRepo": "",
+  "allowTeamWatchAndAdd": true,
+  "sparkQuotaGuard": {
+    "maxDailyReads": 45000,
+    "maxDailyWrites": 18000,
+    "freeTierReadLimit": 50000,
+    "freeTierWriteLimit": 20000,
+    "singleDocumentCoalescing": true
+  },
+  "updatedAt": "2026-10-08T03:25:00.000Z"
+}

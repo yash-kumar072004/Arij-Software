@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // =========================================================================
+    // ARIJ SHARED TEAM WORKSPACE — FIREBASE SPARK FREE PLAN ($0/MONTH) RULES
+    // Allows teammates who clone the Arij repository on their own local machine
+    // to watch (read) and add stories (write) without being locked out by
+    // owner-only UID restrictions, while enforcing strict payload size guards
+    // to stay 100% within the Free Spark Plan (1 GiB storage, 50k reads/day, 20k writes/day).
+    // =========================================================================
+    match /arij_shared_workspace/{docId} {
+      allow get, list: if docId == 'main';
+      allow create, update: if docId == 'main'
+        && request.resource.data.keys().hasAll(['workspaceJson', 'updatedAt'])
+        && request.resource.data.workspaceJson is string
+        && request.resource.data.workspaceJson.size() <= 900000;
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

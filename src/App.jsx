@@ -7,6 +7,8 @@ import {
   Calendar,
   Camera,
   CheckCircle2,
+  Database,
+  FileText,
   FolderGit2,
   GitBranch,
   Headphones,
@@ -60,7 +62,9 @@ import {
 } from './components/ActionModals.jsx';
 import { IssueDetailModal } from './components/IssueDetailModal.jsx';
 import { ScreenshotImporterModal } from './components/ScreenshotImporterModal.jsx';
+import { StoryPdfImporterModal } from './components/StoryPdfImporterModal.jsx';
 import { GitHubPushModal } from './components/GitHubPushModal.jsx';
+import { FirebaseFreeSyncModal } from './components/FirebaseFreeSyncModal.jsx';
 import {
   KeyboardShortcutsModal,
   NotificationsDrawerModal,
@@ -194,11 +198,66 @@ export default function App() {
     const hydrated = ensurePersonalWorkspacesForAllUsers(incomingWorkspace);
 
     setWorkspace((prev) => {
-      const keepUserId = hydrated.users.some((u) => u.id === prev.currentUserId)
+      // Non-destructively merge users, projects, sprints, and issues so stories created locally or by a friend are NEVER lost
+      const mergedUsers = [...(hydrated.users || [])];
+      (prev.users || []).forEach((u) => {
+        if (!mergedUsers.some((eu) => eu.id === u.id)) {
+          mergedUsers.push(u);
+        }
+      });
+
+      const mergedProjects = (hydrated.projects || []).map((hp) => {
+        const lp = (prev.projects || []).find((p) => p.id === hp.id);
+        if (!lp) return hp;
+        return {
+          ...hp,
+          issueCounter: Math.max(hp.issueCounter || 100, lp.issueCounter || 100),
+        };
+      });
+      (prev.projects || []).forEach((lp) => {
+        if (!mergedProjects.some((ep) => ep.id === lp.id)) {
+          mergedProjects.push(lp);
+        }
+      });
+
+      const mergedSprints = [...(hydrated.sprints || [])];
+      (prev.sprints || []).forEach((ls) => {
+        if (!mergedSprints.some((es) => es.id === ls.id)) {
+          mergedSprints.push(ls);
+        }
+      });
+
+      const mergedIssues = [...(hydrated.issues || [])];
+      const clientOnlyIssues = [];
+      (prev.issues || []).forEach((li) => {
+        if (!mergedIssues.some((ei) => ei.id === li.id)) {
+          mergedIssues.push(li);
+          clientOnlyIssues.push(li);
+        }
+      });
+
+      if (clientOnlyIssues.length > 0) {
+        fetch('/api/workspace/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: clientIdRef.current,
+            events: clientOnlyIssues.map((iss) => ({
+              type: 'issue:created',
+              payload: {
+                issue: iss,
+                projectId: iss.projectId,
+              },
+            })),
+          }),
+        }).catch(() => {});
+      }
+
+      const keepUserId = mergedUsers.some((u) => u.id === prev.currentUserId)
         ? prev.currentUserId
         : hydrated.currentUserId;
 
-      const keepProjectId = hydrated.projects.some(
+      const keepProjectId = mergedProjects.some(
         (p) => p.id === prev.activeProjectId
       )
         ? prev.activeProjectId
@@ -206,6 +265,10 @@ export default function App() {
 
       return {
         ...hydrated,
+        users: mergedUsers,
+        projects: mergedProjects,
+        sprints: mergedSprints,
+        issues: mergedIssues,
         personalTodosByUser: {
           ...(hydrated.personalTodosByUser || {}),
           ...(prev.personalTodosByUser || {}),
@@ -336,7 +399,9 @@ export default function App() {
   const [showCreateIssueModal, setShowCreateIssueModal] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showScreenshotImporter, setShowScreenshotImporter] = useState(false);
+  const [showStoryPdfImporter, setShowStoryPdfImporter] = useState(false);
   const [showGitHubModal, setShowGitHubModal] = useState(false);
+  const [showFirebaseModal, setShowFirebaseModal] = useState(false);
   const [showUserAccountModal, setShowUserAccountModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
@@ -447,9 +512,7 @@ export default function App() {
       );
       return own.length > 0 ? own : workspace.projects;
     }
-    return workspace.projects.filter(
-      (p) => !p.isPersonal || p.ownerUserId === currentUser.id
-    );
+    return workspace.projects;
   }, [workspace.projects, workspaceScopeMode, currentUser.id]);
 
   const activeProject = useMemo(() => {
@@ -482,10 +545,15 @@ export default function App() {
   };
 
   const projectIssues = useMemo(() => {
-    const base = workspace.issues.filter((i) => i.projectId === activeProject.id);
+    const base = workspace.issues.filter(
+      (i) => i.projectId === activeProject.id || i.isUserCreated
+    );
     if (workspaceScopeMode === 'MY_OWN' && !activeProject.isPersonal) {
       return base.filter(
-        (i) => i.type === IssueType.EPIC || i.assigneeId === currentUser.id
+        (i) =>
+          i.type === IssueType.EPIC ||
+          i.assigneeId === currentUser.id ||
+          i.isUserCreated
       );
     }
     return base;
@@ -584,29 +652,36 @@ export default function App() {
     const now = new Date().toISOString();
     const nextNumber = activeProject.issueCounter + 1;
     const newKey = `${activeProject.key}-${nextNumber}`;
+    const resolvedSprintId =
+      payload.type === IssueType.EPIC
+        ? null
+        : payload.sprintId !== undefined
+        ? payload.sprintId
+        : activeSprint
+        ? activeSprint.id
+        : null;
     const newIssue = {
       id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      isUserCreated: true,
       projectId: activeProject.id,
       key: newKey,
       title: payload.title,
-      description: '',
-      type: payload.type,
-      status: payload.status,
+      description: payload.description || '',
+      type: payload.type || IssueType.STORY,
+      status: payload.status || IssueStatus.TODO,
       priority: payload.priority || IssuePriority.MEDIUM,
       assigneeId:
         payload.assigneeId !== undefined
           ? payload.assigneeId
-          : workspaceScopeMode === 'MY_OWN'
-          ? workspace.currentUserId
-          : activeProject.defaultAssigneeId || workspace.currentUserId,
+          : workspace.currentUserId,
       reporterId: workspace.currentUserId,
-      epicId: payload.epicId,
-      sprintId: payload.sprintId,
+      epicId: payload.epicId || projectEpics[0]?.id || null,
+      sprintId: resolvedSprintId,
       storyPoints: payload.type === IssueType.EPIC ? 0 : 3,
       originalEstimateHours: 8,
       timeSpentHours: 0,
       remainingEstimateHours: 8,
-      labels: [],
+      labels: ['story'],
       componentId: projectComponents[0]?.id || null,
       fixVersionId:
         projectReleases.find((r) => r.status === 'UNRELEASED')?.id || null,
@@ -620,15 +695,20 @@ export default function App() {
       watcherIds: [workspace.currentUserId],
       createdAt: now,
       updatedAt: now,
-      order: projectIssues.length + 1,
+      order: workspace.issues.length + 1,
     };
+
+    setImportBanner(
+      `Created ${newIssue.type} ${newKey} ("${newIssue.title}") — added to Active Board, Backlog, Timeline & Issues!`
+    );
+    setTimeout(() => setImportBanner(null), 5000);
 
     setWorkspace((prev) => ({
       ...prev,
       projects: prev.projects.map((p) =>
         p.id === activeProject.id ? { ...p, issueCounter: nextNumber } : p
       ),
-      issues: [...prev.issues, newIssue],
+      issues: [newIssue, ...prev.issues],
     }));
 
     void dispatchWorkspaceEvent({
@@ -643,37 +723,34 @@ export default function App() {
 
   const handleQuickCreatePersonalIssue = (payload) => {
     const targetAssigneeId = payload.assigneeId || currentUser.id;
-    const personalProj =
-      workspace.projects.find(
-        (p) =>
-          p.ownerUserId === targetAssigneeId ||
-          p.id === `prj-personal-${targetAssigneeId}`
-      ) || activeProject;
-    const personalSprint = workspace.sprints.find(
-      (s) => s.projectId === personalProj.id && s.status === SprintStatus.ACTIVE
-    );
+    const targetProj = activeProject;
+    const targetSprint =
+      workspace.sprints.find(
+        (s) => s.projectId === targetProj.id && s.status === SprintStatus.ACTIVE
+      ) || activeSprint;
 
     const now = new Date().toISOString();
-    const nextNumber = personalProj.issueCounter + 1;
-    const newKey = `${personalProj.key}-${nextNumber}`;
+    const nextNumber = targetProj.issueCounter + 1;
+    const newKey = `${targetProj.key}-${nextNumber}`;
     const newIssue = {
       id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      projectId: personalProj.id,
+      isUserCreated: true,
+      projectId: targetProj.id,
       key: newKey,
       title: payload.title,
-      description: `Created in personal workspace board.`,
-      type: payload.type,
-      status: payload.status,
+      description: `Created by ${currentUser.name} and synced across Active Board & Personal Space.`,
+      type: payload.type || IssueType.STORY,
+      status: payload.status || IssueStatus.TODO,
       priority: IssuePriority.MEDIUM,
       assigneeId: targetAssigneeId,
       reporterId: currentUser.id,
-      epicId: null,
-      sprintId: personalSprint ? personalSprint.id : null,
+      epicId: projectEpics[0]?.id || null,
+      sprintId: targetSprint ? targetSprint.id : null,
       storyPoints: 3,
       originalEstimateHours: 6,
       timeSpentHours: 0,
       remainingEstimateHours: 6,
-      labels: ['personal'],
+      labels: ['personal', 'story'],
       componentId: null,
       fixVersionId: null,
       startDate: now.slice(0, 10),
@@ -689,19 +766,24 @@ export default function App() {
       order: workspace.issues.length + 1,
     };
 
+    setImportBanner(
+      `Created ${newIssue.type} ${newKey} ("${newIssue.title}") — added to Active Board, Personal Space & Backlog!`
+    );
+    setTimeout(() => setImportBanner(null), 5000);
+
     setWorkspace((prev) => ({
       ...prev,
       projects: prev.projects.map((p) =>
-        p.id === personalProj.id ? { ...p, issueCounter: nextNumber } : p
+        p.id === targetProj.id ? { ...p, issueCounter: nextNumber } : p
       ),
-      issues: [...prev.issues, newIssue],
+      issues: [newIssue, ...prev.issues],
     }));
 
     void dispatchWorkspaceEvent({
       type: 'issue:created',
       payload: {
         issue: newIssue,
-        projectId: personalProj.id,
+        projectId: targetProj.id,
         nextCounter: nextNumber,
       },
     });
@@ -714,29 +796,92 @@ export default function App() {
     const newKey = `${targetProject.key}-${nextNumber}`;
     const now = new Date().toISOString();
 
+    const targetActiveSprint = workspace.sprints.find(
+      (s) => s.projectId === targetProject.id && s.status === SprintStatus.ACTIVE
+    );
+    const validSprintForProject = payload.sprintId
+      ? workspace.sprints.find(
+          (s) => s.id === payload.sprintId && s.projectId === targetProject.id
+        )
+      : null;
+    const resolvedSprintId =
+      payload.type === IssueType.EPIC
+        ? null
+        : validSprintForProject
+        ? validSprintForProject.id
+        : targetActiveSprint
+        ? targetActiveSprint.id
+        : null;
+
+    const targetProjectEpics = workspace.issues.filter(
+      (i) => i.projectId === targetProject.id && i.type === IssueType.EPIC
+    );
+    const validEpicForProject = payload.epicId
+      ? targetProjectEpics.find((ep) => ep.id === payload.epicId)
+      : null;
+
+    const targetProjectReleases = workspace.releases.filter(
+      (r) => r.projectId === targetProject.id
+    );
+    const targetProjectComponents = workspace.components.filter(
+      (c) => c.projectId === targetProject.id
+    );
+    const resolvedComponentId =
+      payload.componentId &&
+      targetProjectComponents.some((c) => c.id === payload.componentId)
+        ? payload.componentId
+        : targetProjectComponents[0]?.id || null;
+    const resolvedFixVersionId =
+      payload.fixVersionId &&
+      targetProjectReleases.some((r) => r.id === payload.fixVersionId)
+        ? payload.fixVersionId
+        : targetProjectReleases.find((r) => r.status === 'UNRELEASED')?.id ||
+          targetProjectReleases[0]?.id ||
+          null;
+
     const newIssue = {
       id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      isUserCreated: true,
       projectId: targetProject.id,
       key: newKey,
       title: payload.title,
-      description: payload.description,
-      type: payload.type,
-      status: payload.status,
-      priority: payload.priority,
-      assigneeId: payload.assigneeId,
+      description: payload.description || '',
+      type: payload.type || IssueType.STORY,
+      status: payload.status || IssueStatus.TODO,
+      priority: payload.priority || IssuePriority.MEDIUM,
+      assigneeId:
+        payload.assigneeId !== undefined
+          ? payload.assigneeId
+          : workspace.currentUserId,
       reporterId: workspace.currentUserId,
-      epicId: payload.epicId,
-      sprintId: payload.sprintId,
-      storyPoints: payload.storyPoints,
-      originalEstimateHours: payload.originalEstimateHours,
+      epicId: validEpicForProject
+        ? validEpicForProject.id
+        : targetProjectEpics[0]?.id || null,
+      sprintId: resolvedSprintId,
+      storyPoints: payload.storyPoints ?? 5,
+      originalEstimateHours: payload.originalEstimateHours ?? 12,
       timeSpentHours: 0,
-      remainingEstimateHours: payload.originalEstimateHours,
-      labels: payload.labels,
-      componentId: payload.componentId,
-      fixVersionId: payload.fixVersionId,
+      remainingEstimateHours: payload.originalEstimateHours ?? 12,
+      labels:
+        Array.isArray(payload.labels) && payload.labels.length > 0
+          ? payload.labels
+          : ['story'],
+      componentId: resolvedComponentId,
+      fixVersionId: resolvedFixVersionId,
       startDate: now.slice(0, 10),
-      dueDate: payload.dueDate,
-      subtasks: [],
+      dueDate: payload.dueDate || '2026-10-22',
+      subtasks: Array.isArray(payload.subtasks)
+        ? payload.subtasks.map((st, idx) => ({
+            id: st.id || `sub-${Date.now()}-${idx}`,
+            key: st.key || `${newKey}-${idx + 1}`,
+            title: st.title,
+            completed: !!st.completed,
+            assigneeId: payload.assigneeId || workspace.currentUserId,
+          }))
+        : [],
+      attachments: Array.isArray(payload.attachments)
+        ? payload.attachments
+        : [],
       links: [],
       comments: [],
       workLogs: [],
@@ -747,13 +892,24 @@ export default function App() {
       order: workspace.issues.length + 1,
     };
 
+    if (Array.isArray(payload.attachments) && payload.attachments.length > 0) {
+      setImportBanner(
+        `Created ${newKey} ("${payload.title}") with auto-extracted inputs from Story PDF "${payload.attachments[0].name}".`
+      );
+    } else {
+      setImportBanner(
+        `Created ${newIssue.type} ${newKey} ("${newIssue.title}") — added to Active Board, Backlog, Timeline & Issues!`
+      );
+    }
+    setTimeout(() => setImportBanner(null), 6000);
+
     setWorkspace((prev) => ({
       ...prev,
       activeProjectId: targetProject.id,
       projects: prev.projects.map((p) =>
         p.id === targetProject.id ? { ...p, issueCounter: nextNumber } : p
       ),
-      issues: [...prev.issues, newIssue],
+      issues: [newIssue, ...prev.issues],
     }));
 
     void dispatchWorkspaceEvent({
@@ -1165,7 +1321,7 @@ export default function App() {
     setWorkspace((prev) => ({
       ...prev,
       currentUserId: switchToNewUser ? user.id : prev.currentUserId,
-      activeProjectId: switchToNewUser ? bundle.project.id : prev.activeProjectId,
+      activeProjectId: prev.activeProjectId,
       users: [...prev.users, user],
       projects: [...prev.projects, bundle.project],
       sprints: [...prev.sprints, bundle.sprint],
@@ -1677,8 +1833,18 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Zone 3: Primary Actions (+ Create Issue, Notifications, Theme, Shortcuts, Account) */}
+        {/* Zone 3: Primary Actions (+ Create Issue, Firebase Free Sync, Notifications, Theme, Shortcuts, Account) */}
         <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setShowFirebaseModal(true)}
+            className="px-3 py-1.5 text-xs font-semibold text-emerald-300 bg-emerald-950/70 border border-emerald-700/70 rounded-md hover:bg-emerald-900/80 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
+            title="Shared Firebase Database (100% Free Spark Plan — Never Paid Plan)"
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden md:inline">Firebase Free ($0 Spark)</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setShowCreateIssueModal(true)}
@@ -1872,11 +2038,21 @@ export default function App() {
                 </span>
               </div>
 
+              {/* Prominent Upload Story PDF CTA */}
+              <button
+                type="button"
+                onClick={() => setShowStoryPdfImporter(true)}
+                className="w-full mt-2 py-2 px-3 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center justify-center gap-2 transition-colors shadow-2xs"
+              >
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                Upload Story PDF
+              </button>
+
               {/* Prominent Screenshot Importer CTA */}
               <button
                 type="button"
                 onClick={() => setShowScreenshotImporter(true)}
-                className="w-full mt-2 py-2 px-3 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-2 px-3 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md flex items-center justify-center gap-2 transition-colors"
               >
                 <Camera className="w-3.5 h-3.5 shrink-0" />
                 Import Board Screenshot
@@ -1890,6 +2066,16 @@ export default function App() {
               >
                 <FolderGit2 className="w-3.5 h-3.5 shrink-0" />
                 Push Project to GitHub
+              </button>
+
+              {/* Shared Firebase Free Tier Button */}
+              <button
+                type="button"
+                onClick={() => setShowFirebaseModal(true)}
+                className="w-full py-2 px-3 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-md flex items-center justify-center gap-2 transition-colors"
+              >
+                <Database className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                Firebase Free DB ($0 Spark)
               </button>
             </div>
 
@@ -2277,6 +2463,7 @@ export default function App() {
               onQuickCreateIssue={handleQuickCreateIssue}
               onOpenCompleteSprintModal={() => setShowCompleteSprintModal(true)}
               onOpenScreenshotImporter={() => setShowScreenshotImporter(true)}
+              onOpenStoryPdfImporter={() => setShowStoryPdfImporter(true)}
               onNavigateToBacklog={() => setActiveTab(NavigationTab.BACKLOG)}
             />
           )}
@@ -2444,8 +2631,8 @@ export default function App() {
         <CreateIssueModal
           projects={visibleProjects}
           activeProjectId={activeProject.id}
-          epics={projectEpics}
-          sprints={projectSprints}
+          epics={workspace.issues.filter((i) => i.type === IssueType.EPIC)}
+          sprints={workspace.sprints}
           releases={projectReleases}
           components={projectComponents}
           users={workspace.users}
@@ -2505,9 +2692,53 @@ export default function App() {
         />
       )}
 
-      {/* Push to GitHub Modal */}
+      {/* Story PDF Auto-Extractor Modal */}
+      {showStoryPdfImporter && (
+        <StoryPdfImporterModal
+          projects={visibleProjects}
+          activeProjectId={activeProject.id}
+          epics={workspace.issues.filter((i) => i.type === IssueType.EPIC)}
+          sprints={workspace.sprints}
+          releases={projectReleases}
+          components={projectComponents}
+          users={workspace.users}
+          currentUserId={workspace.currentUserId}
+          onClose={() => setShowStoryPdfImporter(false)}
+          onCreateIssue={handleFullCreateIssue}
+        />
+      )}
+
+      {/* Shared Firebase Free Tier (Spark $0 Plan) Sync Modal */}
+      {showFirebaseModal && (
+        <FirebaseFreeSyncModal
+          onClose={() => setShowFirebaseModal(false)}
+          onWorkspaceSynced={(remoteWs, bannerMsg) => {
+            reconcileServerState(remoteWs, revisionRef.current + 1);
+            if (bannerMsg) {
+              setImportBanner(bannerMsg);
+              setTimeout(() => setImportBanner(null), 6000);
+            }
+          }}
+        />
+      )}
+
+      {/* Push to GitHub & Pull Friend's Stories Modal */}
       {showGitHubModal && (
-        <GitHubPushModal onClose={() => setShowGitHubModal(false)} />
+        <GitHubPushModal
+          currentWorkspace={workspace}
+          onMergeRemoteWorkspace={(remoteWs, bannerMsg) => {
+            reconcileServerState(remoteWs, revisionRef.current + 1);
+            void dispatchWorkspaceEvent({
+              type: 'workspace:imported',
+              payload: { updatedWorkspace: remoteWs },
+            });
+            if (bannerMsg) {
+              setImportBanner(bannerMsg);
+              setTimeout(() => setImportBanner(null), 6000);
+            }
+          }}
+          onClose={() => setShowGitHubModal(false)}
+        />
       )}
 
       {/* User Account, Authentication, 2FA, Preferences & Organization Modal */}

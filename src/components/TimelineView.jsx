@@ -310,6 +310,84 @@ export const TimelineView = ({
                 </React.Fragment>
               );
             })}
+
+            {/* Stories & Tasks without a Parent Epic */}
+            {issues.filter((i) => !i.epicId && i.type !== IssueType.EPIC).length > 0 && (
+              <>
+                <div className="grid grid-cols-12 bg-blue-50/60 border-t border-slate-200">
+                  <div className="col-span-5 px-4 py-2.5 border-r border-slate-200 flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-900">
+                      Direct Sprint Stories &amp; Tasks (Unlinked to Epic)
+                    </span>
+                    <span className="font-mono text-[11px] font-semibold text-blue-700">
+                      {issues.filter((i) => !i.epicId && i.type !== IssueType.EPIC).length} items
+                    </span>
+                  </div>
+                  <div className="col-span-7 px-3 py-2.5 text-[11px] text-slate-500">
+                    All newly created stories without a parent epic appear here automatically
+                  </div>
+                </div>
+                {issues
+                  .filter((i) => !i.epicId && i.type !== IssueType.EPIC)
+                  .map((child) => {
+                    const geom = computeBarGeometry(child.startDate, child.dueDate);
+                    const assignee = child.assigneeId ? userMap[child.assigneeId] : null;
+                    const barColor =
+                      child.status === IssueStatus.DONE
+                        ? 'bg-emerald-600'
+                        : child.status === IssueStatus.IN_PROGRESS ||
+                          child.status === IssueStatus.IN_REVIEW ||
+                          child.status === IssueStatus.QA
+                        ? 'bg-blue-600'
+                        : 'bg-slate-500';
+
+                    return (
+                      <div
+                        key={child.id}
+                        onClick={() => onSelectIssue(child.id)}
+                        className="grid grid-cols-12 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                      >
+                        <div className="col-span-5 pl-6 pr-4 py-2.5 border-r border-slate-200 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <IssueTypeIcon type={child.type} className="w-3.5 h-3.5" />
+                            <span className="font-mono text-xs text-slate-500 shrink-0">
+                              {child.key}
+                            </span>
+                            <span className="text-xs font-medium text-slate-800 truncate">
+                              {child.title}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`text-[11px] font-semibold ${
+                                STATUS_CONFIG[child.status]?.textClass || 'text-slate-600'
+                              }`}
+                            >
+                              {STATUS_CONFIG[child.status]?.label || child.status}
+                            </span>
+                            <UserAvatar user={assignee} size="xs" />
+                          </div>
+                        </div>
+                        <div className="col-span-7 relative flex items-center py-2 px-1">
+                          <div
+                            className="absolute top-0 bottom-0 w-px bg-blue-500/40 pointer-events-none"
+                            style={{ left: `${todayLeftPct}%` }}
+                          />
+                          <div
+                            style={{
+                              left: `${geom.leftPct}%`,
+                              width: `${geom.widthPct}%`,
+                            }}
+                            className={`relative h-4 rounded ${barColor} text-white px-2 flex items-center text-[10px] font-mono truncate shadow-2xs`}
+                          >
+                            {child.key} ({child.storyPoints || 3}p)
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </>
+            )}
           </div>
 
           {/* Quick Add Epic Row */}

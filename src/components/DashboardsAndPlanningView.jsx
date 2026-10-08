@@ -276,7 +276,10 @@ export const DashboardsAndPlanningView = ({
 
   // ==================== METRICS FOR GADGETS ====================
   const nonEpicIssues = useMemo(
-    () => issues.filter((i) => i.type !== IssueType.EPIC),
+    () =>
+      issues.filter(
+        (i) => i.type !== IssueType.EPIC || !String(i.id).startsWith('iss-epic-')
+      ),
     [issues]
   );
 

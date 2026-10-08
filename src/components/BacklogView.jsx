@@ -71,7 +71,7 @@ export const BacklogView = ({
 
   const nonEpicIssues = useMemo(() => {
     return issues.filter(
-      (i) => i.type !== IssueType.EPIC && i.type !== IssueType.SUBTASK
+      (i) => i.type !== IssueType.EPIC || !String(i.id).startsWith('iss-epic-')
     );
   }, [issues]);
 
