@@ -23,6 +23,7 @@ import {
   RotateCcw,
   Search,
   Settings,
+  ShieldAlert,
   Sun,
   UserCheck,
   Users,
@@ -40,6 +41,7 @@ import {
   createPersonalWorkspaceBundle,
   INITIAL_WORKSPACE_STATE,
 } from './data/initialWorkspace.js';
+import { parseStructuredStoryFromExtractedText } from './utils/storyTextParser.js';
 import { ArijLogo, IssueTypeIcon, UserAvatar } from './components/ArijPrimitives.jsx';
 import { BoardView } from './components/BoardView.jsx';
 import { BacklogView } from './components/BacklogView.jsx';
@@ -54,6 +56,7 @@ import { AutomationAndWorkflowsView } from './components/AutomationAndWorkflowsV
 import { ArijAiAssistantView } from './components/ArijAiAssistantView.jsx';
 import { ServiceAndItsmView } from './components/ServiceAndItsmView.jsx';
 import { EnterpriseAndDevView } from './components/EnterpriseAndDevView.jsx';
+import { VulnerabilitiesView } from './components/VulnerabilitiesView.jsx';
 import {
   CompleteSprintModal,
   CreateIssueModal,
@@ -93,12 +96,53 @@ function getOrCreateClientId() {
  */
 function ensurePersonalWorkspacesForAllUsers(ws) {
   let updated = false;
+  const nextUsers = [...(ws.users || [])];
   const nextProjects = [...(ws.projects || [])];
   const nextSprints = [...(ws.sprints || [])];
+  const nextComponents = [...(ws.components || [])];
   const nextIssues = [...(ws.issues || [])];
   const nextTodos = { ...(ws.personalTodosByUser || {}) };
 
-  (ws.users || []).forEach((u) => {
+  // Ensure all seed users (including Suman Manna & Yash Kumar) exist
+  (INITIAL_WORKSPACE_STATE.users || []).forEach((su) => {
+    if (!nextUsers.some((u) => u.id === su.id)) {
+      nextUsers.push(su);
+      updated = true;
+    }
+  });
+
+  // Ensure primary project prj-1 uses key KP and name Kawach Product
+  const prj1Idx = nextProjects.findIndex((p) => p.id === 'prj-1');
+  if (prj1Idx !== -1 && nextProjects[prj1Idx].key !== 'KP') {
+    nextProjects[prj1Idx] = {
+      ...nextProjects[prj1Idx],
+      key: 'KP',
+      name: 'Kawach Product',
+      issueCounter: Math.max(nextProjects[prj1Idx].issueCounter || 100, 6453),
+    };
+    updated = true;
+  }
+
+  // Ensure seed components (including Frontend SPA) exist
+  (INITIAL_WORKSPACE_STATE.components || []).forEach((sc) => {
+    if (!nextComponents.some((c) => c.id === sc.id)) {
+      nextComponents.push(sc);
+      updated = true;
+    }
+  });
+
+  // Ensure KP-5831 Epic and KP-6453 Story exist
+  (INITIAL_WORKSPACE_STATE.issues || []).forEach((si) => {
+    if (
+      (si.id === 'iss-epic-kp-5831' || si.id === 'iss-kp-6453') &&
+      !nextIssues.some((i) => i.id === si.id || i.key === si.key)
+    ) {
+      nextIssues.unshift(si);
+      updated = true;
+    }
+  });
+
+  nextUsers.forEach((u) => {
     const hasPersonalProj = nextProjects.some(
       (p) => p.ownerUserId === u.id || p.id === `prj-personal-${u.id}`
     );
@@ -124,8 +168,10 @@ function ensurePersonalWorkspacesForAllUsers(ws) {
   if (!updated) return ws;
   return {
     ...ws,
+    users: nextUsers,
     projects: nextProjects,
     sprints: nextSprints,
+    components: nextComponents,
     issues: nextIssues,
     personalTodosByUser: nextTodos,
   };
@@ -594,26 +640,54 @@ export default function App() {
         (i) =>
           i.key.toLowerCase().includes(q) ||
           i.title.toLowerCase().includes(q) ||
-          i.labels.some((l) => l.toLowerCase().includes(q))
+          String(i.description || '').toLowerCase().includes(q) ||
+          String(i.userStory || '').toLowerCase().includes(q) ||
+          (i.labels || []).some((l) => l.toLowerCase().includes(q))
       )
-      .slice(0, 8);
+      .slice(0, 10);
   }, [workspace.issues, globalSearch]);
 
   // Core Mutation Handlers
   const handleUpdateIssue = (issueId, updates) => {
+    const targetIssue = workspace.issues.find((iss) => iss.id === issueId);
+    if (
+      targetIssue &&
+      updates.status &&
+      updates.status !== targetIssue.status
+    ) {
+      const issueProj =
+        workspace.projects.find((p) => p.id === targetIssue.projectId) ||
+        activeProject;
+      const transitionMap = issueProj?.workflowTransitions;
+      if (
+        transitionMap &&
+        Array.isArray(transitionMap[targetIssue.status]) &&
+        !transitionMap[targetIssue.status].includes(updates.status)
+      ) {
+        setImportBanner(
+          `Workflow Rule (${issueProj.key}): Transition from ${targetIssue.status} to ${updates.status} is restricted by project workflow configuration.`
+        );
+        setTimeout(() => setImportBanner(null), 4500);
+        return;
+      }
+    }
+
     const now = new Date().toISOString();
     setWorkspace((prev) => ({
       ...prev,
       issues: prev.issues.map((iss) => {
         if (iss.id !== issueId) return iss;
 
-        const newHistory = [...iss.history];
+        const newHistory = [...(iss.history || [])];
         const trackedFields = [
+          'title',
           'status',
           'priority',
           'assigneeId',
+          'reporterId',
           'sprintId',
           'storyPoints',
+          'dueDate',
           'type',
         ];
         trackedFields.forEach((field) => {
@@ -637,6 +711,28 @@ export default function App() {
         };
       }),
     }));
+
+    if (
+      targetIssue &&
+      (updates.status !== undefined ||
+        updates.priority !== undefined ||
+        updates.assigneeId !== undefined)
+    ) {
+      const changedFields = Object.keys(updates).join(', ');
+      setNotifications((prev) => [
+        {
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+          typeLabel: 'WATCHER ALERT · ISSUE UPDATED',
+          category: 'STATUS',
+          title: `${targetIssue.key} updated (${changedFields})`,
+          body: `${currentUser?.name || 'Team Member'} updated ${changedFields} on "${targetIssue.title}".`,
+          time: 'Just now',
+          read: false,
+          issueId: targetIssue.id,
+        },
+        ...prev,
+      ]);
+    }
 
     void dispatchWorkspaceEvent({
       type: 'issue:updated',
@@ -792,10 +888,109 @@ export default function App() {
   const handleFullCreateIssue = (payload) => {
     const targetProject =
       workspace.projects.find((p) => p.id === payload.projectId) || activeProject;
-    const nextNumber = targetProject.issueCounter + 1;
-    const newKey = `${targetProject.key}-${nextNumber}`;
+    const customKey = payload.customIssueKey
+      ? String(payload.customIssueKey).trim().toUpperCase()
+      : '';
+    const customKeyNum = customKey.includes('-')
+      ? parseInt(customKey.split('-')[1], 10)
+      : NaN;
+    const nextNumber = !Number.isNaN(customKeyNum)
+      ? Math.max(targetProject.issueCounter || 100, customKeyNum)
+      : (targetProject.issueCounter || 100) + 1;
+    const newKey =
+      customKey || `${payload.projectKey || targetProject.key}-${nextNumber}`;
     const now = new Date().toISOString();
 
+    // 1. Resolve or auto-create Assignee and Reporter by name if provided from PDF
+    let updatedUsers = [...workspace.users];
+    const resolveOrAddUserByName = (fullName, fallbackId) => {
+      const clean = String(fullName || '').trim();
+      if (!clean || /^unassigned$/i.test(clean)) return null;
+      const existing = updatedUsers.find(
+        (u) => u.name.toLowerCase() === clean.toLowerCase()
+      );
+      if (existing) return existing.id;
+      const parts = clean.split(/\s+/).filter(Boolean);
+      const initials =
+        parts.length >= 2
+          ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+          : clean.slice(0, 2).toUpperCase();
+      const createdUser = {
+        id: `usr-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        name: clean,
+        email: `${clean.toLowerCase().replace(/[^a-z0-9]+/g, '.')}@kawach.ai`,
+        role: 'QA Automation Engineer',
+        department: 'Quality Engineering',
+        avatarUrl: '',
+        initials,
+      };
+      updatedUsers.push(createdUser);
+      void dispatchWorkspaceEvent({
+        type: 'user:added',
+        payload: { user: createdUser },
+      });
+      return createdUser.id;
+    };
+
+    const resolvedAssigneeId =
+      payload.assigneeName !== undefined
+        ? resolveOrAddUserByName(payload.assigneeName, workspace.currentUserId)
+        : payload.assigneeId !== undefined
+        ? payload.assigneeId
+        : workspace.currentUserId;
+
+    const resolvedReporterId =
+      payload.reporterName !== undefined
+        ? resolveOrAddUserByName(
+            payload.reporterName,
+            resolvedAssigneeId || workspace.currentUserId
+          ) ||
+          resolvedAssigneeId ||
+          workspace.currentUserId
+        : workspace.currentUserId;
+
+    // 2. Resolve or auto-create Component by name if provided from PDF
+    let updatedComponents = [...workspace.components];
+    const targetProjectComponents = updatedComponents.filter(
+      (c) => c.projectId === targetProject.id
+    );
+    let resolvedComponentId = null;
+    if (payload.componentName !== undefined) {
+      const cleanComp = String(payload.componentName || '').trim();
+      if (cleanComp && !/^none$/i.test(cleanComp)) {
+        const existingComp = updatedComponents.find(
+          (c) =>
+            c.projectId === targetProject.id &&
+            c.name.toLowerCase() === cleanComp.toLowerCase()
+        );
+        if (existingComp) {
+          resolvedComponentId = existingComp.id;
+        } else {
+          const newComp = {
+            id: `cmp-${Date.now().toString().slice(-5)}`,
+            projectId: targetProject.id,
+            name: cleanComp,
+            description: `${cleanComp} module for ${targetProject.name}`,
+            leadUserId: resolvedAssigneeId || workspace.currentUserId,
+          };
+          updatedComponents.push(newComp);
+          resolvedComponentId = newComp.id;
+          void dispatchWorkspaceEvent({
+            type: 'component:created',
+            payload: { component: newComp },
+          });
+        }
+      }
+    } else if (
+      payload.componentId &&
+      targetProjectComponents.some((c) => c.id === payload.componentId)
+    ) {
+      resolvedComponentId = payload.componentId;
+    } else {
+      resolvedComponentId = targetProjectComponents[0]?.id || null;
+    }
+
+    // 3. Resolve Sprint (respect explicitNoSprint when Jira PDF says "Sprint: None")
     const targetActiveSprint = workspace.sprints.find(
       (s) => s.projectId === targetProject.id && s.status === SprintStatus.ACTIVE
     );
@@ -805,7 +1000,7 @@ export default function App() {
         )
       : null;
     const resolvedSprintId =
-      payload.type === IssueType.EPIC
+      payload.type === IssueType.EPIC || payload.explicitNoSprint
         ? null
         : validSprintForProject
         ? validSprintForProject.id
@@ -813,24 +1008,24 @@ export default function App() {
         ? targetActiveSprint.id
         : null;
 
+    // 4. Resolve or auto-link Parent Epic (e.g., KP-5831 Automation Test Cases)
     const targetProjectEpics = workspace.issues.filter(
       (i) => i.projectId === targetProject.id && i.type === IssueType.EPIC
     );
+    const matchedEpicByKey = payload.parentKey
+      ? workspace.issues.find(
+          (i) =>
+            i.type === IssueType.EPIC &&
+            i.key.toUpperCase() === String(payload.parentKey).trim().toUpperCase()
+        )
+      : null;
     const validEpicForProject = payload.epicId
       ? targetProjectEpics.find((ep) => ep.id === payload.epicId)
-      : null;
+      : matchedEpicByKey;
 
     const targetProjectReleases = workspace.releases.filter(
       (r) => r.projectId === targetProject.id
     );
-    const targetProjectComponents = workspace.components.filter(
-      (c) => c.projectId === targetProject.id
-    );
-    const resolvedComponentId =
-      payload.componentId &&
-      targetProjectComponents.some((c) => c.id === payload.componentId)
-        ? payload.componentId
-        : targetProjectComponents[0]?.id || null;
     const resolvedFixVersionId =
       payload.fixVersionId &&
       targetProjectReleases.some((r) => r.id === payload.fixVersionId)
@@ -839,46 +1034,116 @@ export default function App() {
           targetProjectReleases[0]?.id ||
           null;
 
+    // 5. Parse structured Story sections dynamically from payload or description (zero hardcoded templates)
+    const parsedFromDescription =
+      payload.description &&
+      /(?:User\s+Story|Scope\s*\/?\s*Description|Acceptance\s+Criteria|Scenario\s+\d+\s*:|Test\s+Cases|Definition\s+of\s+Done)/i.test(
+        payload.description
+      )
+        ? parseStructuredStoryFromExtractedText(payload.description, payload.title || '')
+        : null;
+
+    const finalUserStory =
+      payload.userStory && String(payload.userStory).trim()
+        ? String(payload.userStory).trim()
+        : parsedFromDescription?.userStory || '';
+
+    const finalScopeDescription =
+      payload.scopeDescription && String(payload.scopeDescription).trim()
+        ? String(payload.scopeDescription).trim()
+        : parsedFromDescription?.scopeDescription || '';
+
+    const finalAcceptanceCriteria =
+      Array.isArray(payload.acceptanceCriteria) &&
+      payload.acceptanceCriteria.length > 0
+        ? payload.acceptanceCriteria
+        : parsedFromDescription?.acceptanceCriteria || [];
+
+    const finalTestCases =
+      Array.isArray(payload.testCases) && payload.testCases.length > 0
+        ? payload.testCases
+        : parsedFromDescription?.testCases || [];
+
+    const finalDefinitionOfDone =
+      Array.isArray(payload.definitionOfDone) &&
+      payload.definitionOfDone.length > 0
+        ? payload.definitionOfDone
+        : parsedFromDescription?.definitionOfDone || [];
+
+    const rawSubtasksSource =
+      Array.isArray(payload.subtasks) && payload.subtasks.length > 0
+        ? payload.subtasks
+        : Array.isArray(parsedFromDescription?.subtasks) &&
+          parsedFromDescription.subtasks.length > 0
+        ? parsedFromDescription.subtasks
+        : finalTestCases.map((tc) => ({ title: tc, completed: false }));
+
+    const existingIssueWithSameKey = workspace.issues.find(
+      (i) => i.key.toUpperCase() === newKey.toUpperCase()
+    );
+
     const newIssue = {
-      id: `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: existingIssueWithSameKey
+        ? existingIssueWithSameKey.id
+        : `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       isUserCreated: true,
       projectId: targetProject.id,
+      projectName: payload.projectName || targetProject.name || 'Kawach Product',
+      projectKey: payload.projectKey || targetProject.key || 'KP',
+      parentKey: payload.parentKey || validEpicForProject?.key || 'KP-5831',
+      parentTitle:
+        payload.parentTitle ||
+        validEpicForProject?.title ||
+        'Automation Test Cases',
+      parentStatus: payload.parentStatus || 'IN_PROGRESS',
       key: newKey,
       title: payload.title,
       description: payload.description || '',
+      userStory: finalUserStory,
+      scopeDescription: finalScopeDescription,
+      acceptanceCriteria: finalAcceptanceCriteria,
+      testCases: finalTestCases,
+      definitionOfDone: finalDefinitionOfDone,
       type: payload.type || IssueType.STORY,
       status: payload.status || IssueStatus.TODO,
       priority: payload.priority || IssuePriority.MEDIUM,
-      assigneeId:
-        payload.assigneeId !== undefined
-          ? payload.assigneeId
-          : workspace.currentUserId,
-      reporterId: workspace.currentUserId,
+      assigneeId: resolvedAssigneeId,
+      reporterId: resolvedReporterId,
       epicId: validEpicForProject
         ? validEpicForProject.id
         : targetProjectEpics[0]?.id || null,
       sprintId: resolvedSprintId,
-      storyPoints: payload.storyPoints ?? 5,
-      originalEstimateHours: payload.originalEstimateHours ?? 12,
+      explicitNoSprint: !!payload.explicitNoSprint,
+      storyPoints:
+        payload.storyPoints !== undefined ? payload.storyPoints : 0,
+      originalEstimateHours:
+        payload.originalEstimateHours !== undefined
+          ? payload.originalEstimateHours
+          : 0,
       timeSpentHours: 0,
-      remainingEstimateHours: payload.originalEstimateHours ?? 12,
-      labels:
-        Array.isArray(payload.labels) && payload.labels.length > 0
-          ? payload.labels
-          : ['story'],
+      remainingEstimateHours:
+        payload.originalEstimateHours !== undefined
+          ? payload.originalEstimateHours
+          : 0,
+      labels: Array.isArray(payload.labels) ? payload.labels : [],
+      reviewers: Array.isArray(payload.reviewers) ? payload.reviewers : [],
+      approvers: Array.isArray(payload.approvers) ? payload.approvers : [],
+      createdAtText: payload.createdAtText || 'March 18, 2026 at 5:26 PM',
+      updatedAtText: payload.updatedAtText || 'March 18, 2026 at 5:26 PM',
+      sourceUrl:
+        payload.sourceUrl ||
+        `https://kawach.atlassian.net/browse/${newKey}`,
       componentId: resolvedComponentId,
       fixVersionId: resolvedFixVersionId,
       startDate: now.slice(0, 10),
-      dueDate: payload.dueDate || '2026-10-22',
-      subtasks: Array.isArray(payload.subtasks)
-        ? payload.subtasks.map((st, idx) => ({
-            id: st.id || `sub-${Date.now()}-${idx}`,
-            key: st.key || `${newKey}-${idx + 1}`,
-            title: st.title,
-            completed: !!st.completed,
-            assigneeId: payload.assigneeId || workspace.currentUserId,
-          }))
-        : [],
+      dueDate: payload.dueDate !== undefined ? payload.dueDate : '',
+      subtasks: rawSubtasksSource.map((st, idx) => ({
+        id: st.id || `sub-${Date.now()}-${idx + 1}`,
+        key: `${newKey}-${idx + 1}`,
+        title: st.title,
+        completed: !!st.completed,
+        assigneeId: resolvedAssigneeId || workspace.currentUserId,
+      })),
       attachments: Array.isArray(payload.attachments)
         ? payload.attachments
         : [],
@@ -886,7 +1151,7 @@ export default function App() {
       comments: [],
       workLogs: [],
       history: [],
-      watcherIds: [workspace.currentUserId],
+      watcherIds: [resolvedAssigneeId || workspace.currentUserId],
       createdAt: now,
       updatedAt: now,
       order: workspace.issues.length + 1,
@@ -894,7 +1159,7 @@ export default function App() {
 
     if (Array.isArray(payload.attachments) && payload.attachments.length > 0) {
       setImportBanner(
-        `Created ${newKey} ("${payload.title}") with auto-extracted inputs from Story PDF "${payload.attachments[0].name}".`
+        `Created ${newKey} ("${payload.title}") with full Jira Story structure (${finalAcceptanceCriteria.length} Scenarios · ${finalTestCases.length} Subtasks · DoD) from "${payload.attachments[0].name}".`
       );
     } else {
       setImportBanner(
@@ -905,12 +1170,24 @@ export default function App() {
 
     setWorkspace((prev) => ({
       ...prev,
+      users: updatedUsers,
+      components: updatedComponents,
       activeProjectId: targetProject.id,
       projects: prev.projects.map((p) =>
         p.id === targetProject.id ? { ...p, issueCounter: nextNumber } : p
       ),
-      issues: [newIssue, ...prev.issues],
+      issues: [
+        newIssue,
+        ...prev.issues.filter(
+          (i) =>
+            i.id !== newIssue.id &&
+            i.key.toUpperCase() !== newIssue.key.toUpperCase()
+        ),
+      ],
     }));
+
+    // Automatically open the newly created Story in the full Jira Story Inspector modal so the user sees the exact structure immediately
+    setSelectedIssueId(newIssue.id);
 
     void dispatchWorkspaceEvent({
       type: 'issue:created',
@@ -968,12 +1245,19 @@ export default function App() {
 
   const handleAddComment = (issueId, body) => {
     const now = new Date().toISOString();
+    const mentions = Array.from(
+      String(body || '').matchAll(/@([a-zA-Z0-9._-]+)/g),
+      (m) => m[1]
+    );
     const comment = {
       id: `cmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       authorId: workspace.currentUserId,
       body,
+      mentions,
       createdAt: now,
     };
+    const targetIssue = workspace.issues.find((i) => i.id === issueId);
+
     setWorkspace((prev) => ({
       ...prev,
       issues: prev.issues.map((iss) =>
@@ -986,6 +1270,39 @@ export default function App() {
           : iss
       ),
     }));
+
+    if (mentions.length > 0 || (targetIssue?.watcherIds || []).length > 0) {
+      setNotifications((prev) => [
+        {
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+          typeLabel:
+            mentions.length > 0
+              ? `@MENTION · ${mentions.map((m) => `@${m}`).join(', ')}`
+              : 'COMMENT ADDED',
+          category: 'MENTION',
+          title:
+            mentions.length > 0
+              ? `${currentUser?.name || 'User'} mentioned ${mentions
+                  .map((m) => `@${m}`)
+                  .join(', ')} on ${targetIssue?.key || 'Issue'}`
+              : `New comment on ${targetIssue?.key || 'Issue'}`,
+          body,
+          time: 'Just now',
+          read: false,
+          issueId,
+        },
+        ...prev,
+      ]);
+    }
+
+    fetch(`/api/issues/${encodeURIComponent(issueId)}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        authorId: workspace.currentUserId,
+        body,
+      }),
+    }).catch(() => {});
 
     void dispatchWorkspaceEvent({
       type: 'issue:comment_added',
@@ -2237,6 +2554,24 @@ export default function App() {
 
               <button
                 type="button"
+                onClick={() => setActiveTab(NavigationTab.VULNERABILITIES)}
+                className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors ${
+                  activeTab === NavigationTab.VULNERABILITIES
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <ShieldAlert className="w-4 h-4 text-red-600" />
+                  Vulnerabilities (/vulnerabilities)
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                  KP-6453
+                </span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab(NavigationTab.REPORTS)}
                 className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2.5 transition-colors ${
                   activeTab === NavigationTab.REPORTS
@@ -2508,6 +2843,14 @@ export default function App() {
               onSelectIssue={(id) => setSelectedIssueId(id)}
               onUpdateIssue={handleUpdateIssue}
               onSaveFilter={handleSaveFilter}
+            />
+          )}
+
+          {activeTab === NavigationTab.VULNERABILITIES && (
+            <VulnerabilitiesView
+              issues={workspace.issues}
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              onOpenStoryPdfImporter={() => setShowStoryPdfImporter(true)}
             />
           )}
 

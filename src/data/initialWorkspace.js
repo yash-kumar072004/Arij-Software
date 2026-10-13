@@ -51,7 +51,180 @@ export const INITIAL_USERS = [
     avatarUrl: '',
     initials: 'VD',
   },
+  {
+    id: 'usr-6',
+    name: 'Suman Manna',
+    email: 'suman.manna@kawach.ai',
+    role: 'QA Automation Engineer',
+    department: 'Quality Engineering',
+    avatarUrl: '',
+    initials: 'SM',
+  },
+  {
+    id: 'usr-7',
+    name: 'Yash Kumar',
+    email: 'yash.kumar@kawach.ai',
+    role: 'Principal Architect & Lead',
+    department: 'Core Platform',
+    avatarUrl: '',
+    initials: 'YK',
+  },
 ];
+
+export const SAMPLE_JIRA_STORY_PDF_SPEC = {
+  fileName: '[KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf',
+  issueKey: 'KP-6453',
+  projectName: 'Kawach Product',
+  projectKey: 'KP',
+  parentKey: 'KP-5831',
+  parentTitle: 'Automation Test Cases',
+  parentStatus: 'IN_PROGRESS',
+  title: 'Automation Test for Vulnerabilities List – Search, Filter and Show Page',
+  type: IssueType.STORY,
+  status: IssueStatus.TODO,
+  priority: IssuePriority.MEDIUM,
+  assigneeName: 'Suman Manna',
+  assigneeInitials: 'SM',
+  reporterName: 'Suman Manna',
+  reporterInitials: 'SM',
+  componentName: 'Frontend SPA',
+  labels: [],
+  reviewers: [],
+  approvers: [],
+  sprintName: 'None',
+  storyPoints: null,
+  originalEstimateHours: null,
+  dueDate: '',
+  createdAtText: 'March 18, 2026 at 5:26 PM',
+  updatedAtText: 'March 18, 2026 at 5:26 PM',
+  sourceUrl: 'https://kawach.atlassian.net/browse/KP-6453',
+  userStory: `As a Kawach user / QA engineer,
+I want automated tests to verify the Vulnerabilities List page functionalities including search, filters, and viewing vulnerability details,
+So that we can ensure the vulnerabilities module works reliably and regression issues are caught early.`,
+  scopeDescription: `This story covers automation testing for the Vulnerabilities section (/vulnerabilities) in the Kawach application.
+The automation script should validate the following flows:
+1. Navigate to the Vulnerabilities page
+2. Search vulnerabilities using the search bar
+3. Apply filters to narrow down vulnerability results
+4. Open a vulnerability item and verify the Show (Details) page`,
+  acceptanceCriteria: [
+    {
+      scenarioTitle: 'Scenario 1: Verify Vulnerabilities List Page Load',
+      steps: [
+        'Given the user is logged into the Kawach portal',
+        'When the user navigates to /vulnerabilities',
+        'Then the Vulnerabilities list page should load successfully',
+        'And the table/list of vulnerabilities should be displayed',
+        'And search and filter options should be visible.',
+      ],
+    },
+    {
+      scenarioTitle: 'Scenario 2: Verify Search Functionality',
+      steps: [
+        'Given the user is on the Vulnerabilities list page',
+        'When the user enters a valid keyword (e.g., CVE ID / vulnerability name / package name) into the search input',
+        'Then the list should update to show matching vulnerability records',
+        'And non-matching records should not be displayed',
+        'And if a random/non-existing keyword is entered, an appropriate empty state message should be shown.',
+      ],
+    },
+    {
+      scenarioTitle: 'Scenario 3: Verify Filter Functionality',
+      steps: [
+        'Given the user is on the Vulnerabilities list page',
+        'When the user applies one or more filters (such as Severity, Status, Project, Package, etc.)',
+        'Then the vulnerability list should refresh and display only records matching the selected filter criteria',
+        'And clearing/resetting the filter should restore the full vulnerability list.',
+      ],
+    },
+    {
+      scenarioTitle: 'Scenario 4: Verify Vulnerability Show / Details Page',
+      steps: [
+        'Given the user has searched and/or filtered the vulnerabilities list',
+        'When the user clicks on a vulnerability record (or the View/Show action)',
+        'Then the Vulnerability Show/Details page should open',
+        'And key details (such as Vulnerability ID/CVE, Severity, Status, Affected Package/Component, Description/Remediation details) should be visible and match the selected record.',
+      ],
+    },
+  ],
+  testCases: [
+    'Verify navigation to /vulnerabilities page and initial table load',
+    'Verify search with valid vulnerability name / CVE ID',
+    'Verify search with invalid keyword shows "No data / No vulnerabilities found"',
+    'Verify single filter application (e.g., Severity = Critical/High)',
+    'Verify multiple filter combinations (if supported)',
+    'Verify clear/reset filter behavior',
+    'Verify clicking a vulnerability opens the Show page and displays accurate details',
+    'Verify back navigation from Show page returns to the Vulnerabilities list.',
+  ],
+  definitionOfDone: [
+    'Automation scripts written and executed successfully',
+    'Covers Search, Filter, and Show page validation on /vulnerabilities',
+    'Assertions added for table data, filter results, and show page fields',
+    'Test runs cleanly in local/CI environment without flakiness',
+    'Code reviewed and merged into the automation repository.',
+  ],
+  description: `Story Title
+Automation Test for Vulnerabilities List – Search, Filter and Show Page
+
+User Story
+As a Kawach user / QA engineer,
+I want automated tests to verify the Vulnerabilities List page functionalities including search, filters, and viewing vulnerability details,
+So that we can ensure the vulnerabilities module works reliably and regression issues are caught early.
+
+Scope / Description
+This story covers automation testing for the Vulnerabilities section (/vulnerabilities) in the Kawach application.
+The automation script should validate the following flows:
+1. Navigate to the Vulnerabilities page
+2. Search vulnerabilities using the search bar
+3. Apply filters to narrow down vulnerability results
+4. Open a vulnerability item and verify the Show (Details) page
+
+Acceptance Criteria
+
+Scenario 1: Verify Vulnerabilities List Page Load
+• Given the user is logged into the Kawach portal
+• When the user navigates to /vulnerabilities
+• Then the Vulnerabilities list page should load successfully
+• And the table/list of vulnerabilities should be displayed
+• And search and filter options should be visible.
+
+Scenario 2: Verify Search Functionality
+• Given the user is on the Vulnerabilities list page
+• When the user enters a valid keyword (e.g., CVE ID / vulnerability name / package name) into the search input
+• Then the list should update to show matching vulnerability records
+• And non-matching records should not be displayed
+• And if a random/non-existing keyword is entered, an appropriate empty state message should be shown.
+
+Scenario 3: Verify Filter Functionality
+• Given the user is on the Vulnerabilities list page
+• When the user applies one or more filters (such as Severity, Status, Project, Package, etc.)
+• Then the vulnerability list should refresh and display only records matching the selected filter criteria
+• And clearing/resetting the filter should restore the full vulnerability list.
+
+Scenario 4: Verify Vulnerability Show / Details Page
+• Given the user has searched and/or filtered the vulnerabilities list
+• When the user clicks on a vulnerability record (or the View/Show action)
+• Then the Vulnerability Show/Details page should open
+• And key details (such as Vulnerability ID/CVE, Severity, Status, Affected Package/Component, Description/Remediation details) should be visible and match the selected record.
+
+Test Cases to Automate
+1. Verify navigation to /vulnerabilities page and initial table load
+2. Verify search with valid vulnerability name / CVE ID
+3. Verify search with invalid keyword shows "No data / No vulnerabilities found"
+4. Verify single filter application (e.g., Severity = Critical/High)
+5. Verify multiple filter combinations (if supported)
+6. Verify clear/reset filter behavior
+7. Verify clicking a vulnerability opens the Show page and displays accurate details
+8. Verify back navigation from Show page returns to the Vulnerabilities list.
+
+Definition of Done (DoD)
+• Automation scripts written and executed successfully
+• Covers Search, Filter, and Show page validation on /vulnerabilities
+• Assertions added for table data, filter results, and show page fields
+• Test runs cleanly in local/CI environment without flakiness
+• Code reviewed and merged into the automation repository.`,
+};
 
 /**
  * Helper to generate a dedicated personal project, active sprint, and starter tasks
@@ -241,17 +414,17 @@ export const INITIAL_WORKSPACE_STATE = {
   projects: [
     {
       id: 'prj-1',
-      key: 'KAW',
-      name: 'Kawach Cloud Security Platform',
+      key: 'KP',
+      name: 'Kawach Product',
       description:
-        'Enterprise zero-trust telemetry, real-time threat detection, and automated policy enforcement engine.',
+        'Kawach Product & Cloud Security Platform — Vulnerabilities List (/vulnerabilities), Search, Filter, Show Page, Zero-Trust Telemetry, and QA Automation.',
       category: 'Software Engineering',
       template: 'Scrum',
       leadId: 'usr-1',
-      defaultAssigneeId: 'usr-3',
+      defaultAssigneeId: 'usr-6',
       ownerUserId: null,
       isPersonal: false,
-      issueCounter: 114,
+      issueCounter: 6453,
       wipLimits: {
         [IssueStatus.TODO]: 0,
         [IssueStatus.IN_PROGRESS]: 4,
@@ -358,6 +531,13 @@ export const INITIAL_WORKSPACE_STATE = {
   ],
   components: [
     {
+      id: 'cmp-frontend-spa',
+      projectId: 'prj-1',
+      name: 'Frontend SPA',
+      description: 'Single-Page Application UI for Vulnerabilities List, Search, Filter, and Show (Details) views.',
+      leadId: 'usr-6',
+    },
+    {
       id: 'cmp-1',
       projectId: 'prj-1',
       name: 'Auth & RBAC Engine',
@@ -419,6 +599,103 @@ export const INITIAL_WORKSPACE_STATE = {
     },
   ],
   issues: [
+    // ==================== KAWACH PRODUCT (KP) SAMPLE JIRA STORY & PARENT EPIC ====================
+    {
+      id: 'iss-epic-kp-5831',
+      projectId: 'prj-1',
+      key: 'KP-5831',
+      title: 'Automation Test Cases',
+      description:
+        'Parent Epic tracking end-to-end QA automation test suites across Kawach Product modules including Vulnerabilities List, Search, Filter, and Show/Details pages.',
+      type: IssueType.EPIC,
+      status: IssueStatus.IN_PROGRESS,
+      priority: IssuePriority.HIGH,
+      assigneeId: 'usr-6',
+      reporterId: 'usr-6',
+      epicId: null,
+      sprintId: null,
+      storyPoints: 0,
+      originalEstimateHours: 40,
+      timeSpentHours: 12,
+      remainingEstimateHours: 28,
+      labels: ['automation', 'qa-suite'],
+      componentId: 'cmp-frontend-spa',
+      fixVersionId: 'rel-2',
+      startDate: '2026-03-10',
+      dueDate: '2026-10-30',
+      subtasks: [],
+      links: [],
+      comments: [],
+      workLogs: [],
+      history: [],
+      watcherIds: ['usr-6', 'usr-1'],
+      createdAt: '2026-03-18T17:26:00.000Z',
+      updatedAt: '2026-03-18T17:26:00.000Z',
+      order: 0,
+    },
+    {
+      id: 'iss-kp-6453',
+      isUserCreated: true,
+      projectId: 'prj-1',
+      key: 'KP-6453',
+      projectName: 'Kawach Product',
+      projectKey: 'KP',
+      parentKey: 'KP-5831',
+      parentTitle: 'Automation Test Cases',
+      parentStatus: 'IN_PROGRESS',
+      title: 'Automation Test for Vulnerabilities List – Search, Filter and Show Page',
+      description: SAMPLE_JIRA_STORY_PDF_SPEC.description,
+      userStory: SAMPLE_JIRA_STORY_PDF_SPEC.userStory,
+      scopeDescription: SAMPLE_JIRA_STORY_PDF_SPEC.scopeDescription,
+      acceptanceCriteria: SAMPLE_JIRA_STORY_PDF_SPEC.acceptanceCriteria,
+      testCases: SAMPLE_JIRA_STORY_PDF_SPEC.testCases,
+      definitionOfDone: SAMPLE_JIRA_STORY_PDF_SPEC.definitionOfDone,
+      type: IssueType.STORY,
+      status: IssueStatus.TODO,
+      priority: IssuePriority.MEDIUM,
+      assigneeId: 'usr-6',
+      reporterId: 'usr-6',
+      epicId: 'iss-epic-kp-5831',
+      sprintId: null,
+      storyPoints: 0,
+      originalEstimateHours: 0,
+      timeSpentHours: 0,
+      remainingEstimateHours: 0,
+      labels: [],
+      reviewers: [],
+      approvers: [],
+      componentId: 'cmp-frontend-spa',
+      componentName: 'Frontend SPA',
+      fixVersionId: null,
+      startDate: '2026-03-18',
+      dueDate: '',
+      createdAtText: 'March 18, 2026 at 5:26 PM',
+      updatedAtText: 'March 18, 2026 at 5:26 PM',
+      sourceUrl: 'https://kawach.atlassian.net/browse/KP-6453',
+      subtasks: SAMPLE_JIRA_STORY_PDF_SPEC.testCases.map((tc, idx) => ({
+        id: `sub-kp-6453-${idx + 1}`,
+        key: `KP-6453-${idx + 1}`,
+        title: tc,
+        completed: false,
+        assigneeId: 'usr-6',
+      })),
+      attachments: [
+        {
+          id: 'att-kp-6453-pdf',
+          name: '[KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf',
+          size: '284 KB',
+          uploadedAt: '2026-03-18',
+        },
+      ],
+      links: [],
+      comments: [],
+      workLogs: [],
+      history: [],
+      watcherIds: ['usr-6', 'usr-1'],
+      createdAt: '2026-03-18T17:26:00.000Z',
+      updatedAt: '2026-03-18T17:26:00.000Z',
+      order: 1,
+    },
     // ==================== EPICS (PROJECT 1) ====================
     {
       id: 'iss-epic-1',

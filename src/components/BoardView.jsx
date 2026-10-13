@@ -70,6 +70,20 @@ export const BoardView = ({
   const [highPriorityOnly, setHighPriorityOnly] = useState(false);
 
   const prevIssuesCountRef = useRef(issues.length);
+  const prevTopIssueIdRef = useRef(issues[0]?.id || null);
+
+  // Sync any newly added users (e.g. Suman Manna from PDF import) into selectedUserIds
+  useEffect(() => {
+    setSelectedUserIds((prev) => {
+      const next = [...prev];
+      users.forEach((u) => {
+        if (!next.includes(u.id)) {
+          next.push(u.id);
+        }
+      });
+      return next;
+    });
+  }, [users]);
 
   // Automatically ensure currentUserId and any newly created issue's assignee (e.g. when a friend creates a story) are visible at the top of the board
   useEffect(() => {
@@ -83,9 +97,13 @@ export const BoardView = ({
   }, [currentUserId]);
 
   useEffect(() => {
-    if (issues.length > prevIssuesCountRef.current) {
+    const topIssue = issues[0];
+    if (
+      issues.length > prevIssuesCountRef.current ||
+      (topIssue && topIssue.id !== prevTopIssueIdRef.current && topIssue.isUserCreated)
+    ) {
       const latestIssue =
-        issues.find((i) => i.isUserCreated) || issues[0] || issues[issues.length - 1];
+        issues.find((i) => i.isUserCreated) || topIssue || issues[issues.length - 1];
       if (latestIssue) {
         const targetId = latestIssue.assigneeId || 'UNASSIGNED';
         setSelectedUserIds((prev) => [
@@ -108,6 +126,7 @@ export const BoardView = ({
       }
     }
     prevIssuesCountRef.current = issues.length;
+    prevTopIssueIdRef.current = topIssue?.id || null;
   }, [issues, selectedType, selectedEpicId, searchQuery, highPriorityOnly]);
 
   // Drag & Drop State (tracks issueId and target user + status column)

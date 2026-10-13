@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
+import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -15,6 +16,32 @@ import {
   IssueStatus,
   SprintStatus,
 } from './src/types/arij.js';
+import {
+  formatStructuredDescription,
+  normalizePriorityFromText,
+  normalizeStatusFromText,
+  parseStructuredStoryFromExtractedText,
+} from './src/utils/storyTextParser.js';
+import {
+  ARIJ_OPENAPI_SPEC,
+  AttachmentUploadSchema,
+  CommentCreateSchema,
+  hashPassword,
+  IssueCreateSchema,
+  IssueLinkCreateSchema,
+  IssueUpdateSchema,
+  LoginSchema,
+  OrganizationSchema,
+  OrgMemberRoleSchema,
+  ProjectCreateSchema,
+  SavedFilterSchema,
+  signJwtToken,
+  SignupSchema,
+  SprintCreateSchema,
+  verifyJwtToken,
+  verifyPassword,
+  WorkflowConfigSchema,
+} from './src/utils/apiSchemas.js';
 
 dotenv.config();
 
@@ -64,12 +91,68 @@ let authoritativeWorkspace = structuredClone(INITIAL_WORKSPACE_STATE);
 let serverRevision = 1;
 
 function ensureAllUsersHavePersonalWorkspace(ws) {
+  const nextUsers = [...(ws.users || [])];
   const nextProjects = [...(ws.projects || [])];
   const nextSprints = [...(ws.sprints || [])];
+  const nextComponents = [...(ws.components || [])];
   const nextIssues = [...(ws.issues || [])];
   let changed = false;
 
-  (ws.users || []).forEach((u) => {
+  // Ensure all seed users (e.g. Suman Manna SM, Yash Kumar YK) exist
+  (INITIAL_WORKSPACE_STATE.users || []).forEach((seedUser) => {
+    if (
+      !nextUsers.some(
+        (u) =>
+          u.id === seedUser.id ||
+          u.name.toLowerCase() === seedUser.name.toLowerCase()
+      )
+    ) {
+      nextUsers.push(seedUser);
+      changed = true;
+    }
+  });
+
+  // Ensure primary project prj-1 has Kawach Product (KP) metadata
+  const prj1Idx = nextProjects.findIndex((p) => p.id === 'prj-1');
+  if (prj1Idx !== -1 && nextProjects[prj1Idx].key === 'KAW') {
+    nextProjects[prj1Idx] = {
+      ...nextProjects[prj1Idx],
+      key: 'KP',
+      name: 'Kawach Product',
+      issueCounter: Math.max(nextProjects[prj1Idx].issueCounter || 114, 6453),
+    };
+    changed = true;
+  }
+
+  // Ensure seed components (including Frontend SPA) exist
+  (INITIAL_WORKSPACE_STATE.components || []).forEach((seedComp) => {
+    if (
+      !nextComponents.some(
+        (c) =>
+          c.id === seedComp.id ||
+          c.name.toLowerCase() === seedComp.name.toLowerCase()
+      )
+    ) {
+      nextComponents.unshift(seedComp);
+      changed = true;
+    }
+  });
+
+  // Ensure KP-5831 Epic and KP-6453 Story exist
+  ['iss-epic-kp-5831', 'iss-kp-6453'].forEach((seedId) => {
+    const seedIssue = (INITIAL_WORKSPACE_STATE.issues || []).find(
+      (i) => i.id === seedId
+    );
+    if (
+      seedIssue &&
+      !nextIssues.some((i) => i.id === seedIssue.id || i.key === seedIssue.key)
+    ) {
+      nextIssues.unshift(seedIssue);
+      changed = true;
+    }
+  });
+
+  nextUsers.forEach((u) => {
     const exists = nextProjects.some(
       (p) => p.ownerUserId === u.id || p.id === `prj-personal-${u.id}`
     );
@@ -85,8 +168,10 @@ function ensureAllUsersHavePersonalWorkspace(ws) {
   if (!changed) return ws;
   return {
     ...ws,
+    users: nextUsers,
     projects: nextProjects,
     sprints: nextSprints,
+    components: nextComponents,
     issues: nextIssues,
   };
 }
@@ -271,11 +356,67 @@ function applyMutationEvent(ws, event) {
     }
 
     case 'issue:created': {
-      const { issue, projectId, nextCounter } = payload;
+      const {
+        issue,
+        projectId,
+        nextCounter,
+        newUsers = [],
+        newComponents = [],
+        newEpics = [],
+      } = payload;
       if (!issue || !issue.id) return ws;
-      if (ws.issues.some((i) => i.id === issue.id)) {
+
+      let updatedUsers = [...ws.users];
+      if (Array.isArray(newUsers)) {
+        newUsers.forEach((nu) => {
+          if (
+            nu &&
+            nu.id &&
+            !updatedUsers.some(
+              (u) =>
+                u.id === nu.id ||
+                u.name.toLowerCase() === (nu.name || '').toLowerCase()
+            )
+          ) {
+            updatedUsers.push(nu);
+          }
+        });
+      }
+
+      let updatedComponents = [...ws.components];
+      if (Array.isArray(newComponents)) {
+        newComponents.forEach((nc) => {
+          if (
+            nc &&
+            nc.id &&
+            !updatedComponents.some(
+              (c) =>
+                c.id === nc.id ||
+                c.name.toLowerCase() === (nc.name || '').toLowerCase()
+            )
+          ) {
+            updatedComponents.push(nc);
+          }
+        });
+      }
+
+      let baseIssues = [...ws.issues];
+      if (Array.isArray(newEpics)) {
+        newEpics.forEach((ne) => {
+          if (
+            ne &&
+            ne.id &&
+            !baseIssues.some((i) => i.id === ne.id || i.key === ne.key)
+          ) {
+            baseIssues.unshift(ne);
+          }
+        });
+      }
+
+      if (baseIssues.some((i) => i.id === issue.id)) {
         return ws;
       }
+
       const targetProj =
         ws.projects.find((p) => p.id === (projectId || issue.projectId)) ||
         ws.projects[0];
@@ -284,9 +425,13 @@ function applyMutationEvent(ws, event) {
         nextCounter || (targetProj ? targetProj.issueCounter + 1 : 101);
       let resolvedKey =
         issue.key ||
-        `${targetProj ? targetProj.key : 'KAW'}-${resolvedCounter}`;
+        `${targetProj ? targetProj.key : 'KP'}-${resolvedCounter}`;
 
-      if (targetProj && ws.issues.some((i) => i.key === resolvedKey)) {
+      if (issue.preserveCustomKey && issue.key) {
+        resolvedKey = issue.key.trim().toUpperCase();
+        // If an issue with this exact key already exists, replace it so the freshly imported PDF version is authoritative at the top
+        baseIssues = baseIssues.filter((i) => i.key !== resolvedKey);
+      } else if (targetProj && baseIssues.some((i) => i.key === resolvedKey)) {
         resolvedCounter = Math.max(
           targetProj.issueCounter + 1,
           resolvedCounter + 1
@@ -311,10 +456,12 @@ function applyMutationEvent(ws, event) {
         projectId: resolvedProjectId,
         key: resolvedKey,
         sprintId:
-          issue.type === 'EPIC'
+          issue.type === 'EPIC' || issue.explicitNoSprint
             ? null
             : validProjSprint
             ? validProjSprint.id
+            : issue.sprintId === null
+            ? null
             : activeProjSprint
             ? activeProjSprint.id
             : issue.sprintId || null,
@@ -324,8 +471,10 @@ function applyMutationEvent(ws, event) {
             : ws.currentUserId || 'usr-1',
       };
 
-      return {
+      return ensureAllUsersHavePersonalWorkspace({
         ...ws,
+        users: updatedUsers,
+        components: updatedComponents,
         projects: ws.projects.map((p) =>
           p.id === resolvedProjectId
             ? {
@@ -334,8 +483,8 @@ function applyMutationEvent(ws, event) {
               }
             : p
         ),
-        issues: [finalIssue, ...ws.issues],
-      };
+        issues: [finalIssue, ...baseIssues],
+      });
     }
 
     case 'issue:deleted': {
@@ -642,56 +791,532 @@ app.post('/api/workspace/events', async (req, res) => {
 });
 
 // ============================================================================
-// REST API ENDPOINTS (Section 29: /api/projects, /api/issues, /api/users, /api/sprints, /api/boards)
+// AUTHENTICATION, RBAC AUTHORIZATION & PAGINATED REST API (Phases 1–5)
 // ============================================================================
-app.get('/api/projects', (_req, res) => {
-  res.json(authoritativeWorkspace.projects || []);
+const refreshTokenStore = new Map();
+const inAppNotifications = [];
+const organizationRegistry = [
+  {
+    id: 'org-1',
+    name: 'Kawach Enterprise Organization',
+    slug: 'kawach-enterprise',
+    domain: 'kawach.ai',
+    plan: 'ENTERPRISE',
+    members: [
+      { userId: 'usr-1', role: 'ADMIN' },
+      { userId: 'usr-2', role: 'ADMIN' },
+      { userId: 'usr-3', role: 'MEMBER' },
+      { userId: 'usr-4', role: 'MEMBER' },
+      { userId: 'usr-5', role: 'MEMBER' },
+      { userId: 'usr-6', role: 'MEMBER' },
+    ],
+  },
+];
+
+function resolveAuthenticatedUser(req) {
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    const payload = verifyJwtToken(token, 'access');
+    if (payload && payload.sub) {
+      const matched = (authoritativeWorkspace.users || []).find(
+        (u) => u.id === payload.sub
+      );
+      if (matched) return { user: matched, orgRole: payload.orgRole || 'ADMIN' };
+    }
+  }
+  const fallbackUser =
+    (authoritativeWorkspace.users || []).find(
+      (u) => u.id === authoritativeWorkspace.currentUserId
+    ) ||
+    (authoritativeWorkspace.users || [])[0] || {
+      id: 'usr-1',
+      name: 'Arjun Mehta',
+      email: 'arjun.mehta@kawach.ai',
+      role: 'Engineering Lead',
+    };
+  const memberEntry = organizationRegistry[0]?.members.find(
+    (m) => m.userId === fallbackUser.id
+  );
+  return { user: fallbackUser, orgRole: memberEntry?.role || 'ADMIN' };
+}
+
+function requireRole(allowedRoles = ['ADMIN', 'MEMBER']) {
+  return (req, res, next) => {
+    const { user, orgRole } = resolveAuthenticatedUser(req);
+    const requestedRole = req.headers['x-arij-org-role'] || orgRole;
+    if (!allowedRoles.includes(requestedRole)) {
+      res.status(403).json({
+        error: `Forbidden: Role "${requestedRole}" does not have permission. Required: ${allowedRoles.join(' or ')}.`,
+      });
+      return;
+    }
+    req.currentUser = user;
+    req.orgRole = requestedRole;
+    next();
+  };
+}
+
+function paginateArray(items, query = {}) {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(query.limit, 10) || 50));
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const start = (page - 1) * limit;
+  const data = items.slice(start, start + limit);
+  return {
+    data,
+    items: data,
+    page,
+    limit,
+    total,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+  };
+}
+
+// --- Phase 1.1: Auth (Sign Up, Log In, Log Out, Refresh, Profile) ---
+app.post('/api/auth/signup', async (req, res) => {
+  const parsed = SignupSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+  const { email, password, name, username, role, department } = parsed.data;
+  const existing = (authoritativeWorkspace.users || []).find(
+    (u) => u.email.toLowerCase() === email.toLowerCase()
+  );
+  if (existing) {
+    res.status(409).json({ error: 'A user with this email already exists.' });
+    return;
+  }
+
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  const newUser = {
+    id: `usr-${Date.now()}`,
+    name: name.trim(),
+    username: username || email.split('@')[0],
+    email: email.toLowerCase(),
+    initials: initials || 'US',
+    role,
+    department,
+    passwordHash: hashPassword(password),
+  };
+
+  await stateMutex.run(async () => {
+    authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+      type: 'user:created',
+      payload: { user: newUser },
+    });
+    organizationRegistry[0].members.push({ userId: newUser.id, role: 'MEMBER' });
+    serverRevision += 1;
+    await persistDatabaseToDisk();
+  });
+
+  const accessToken = signJwtToken(
+    { sub: newUser.id, email: newUser.email, orgRole: 'MEMBER' },
+    'access'
+  );
+  const refreshToken = signJwtToken({ sub: newUser.id }, 'refresh');
+  refreshTokenStore.set(refreshToken, newUser.id);
+
+  const { passwordHash: _ph, ...safeUser } = newUser;
+  res.status(201).json({
+    ok: true,
+    user: safeUser,
+    accessToken,
+    refreshToken,
+  });
 });
 
-app.get('/api/issues', (_req, res) => {
-  res.json(authoritativeWorkspace.issues || []);
+app.post('/api/auth/login', (req, res) => {
+  const parsed = LoginSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+  const { email, password } = parsed.data;
+  const matchedUser =
+    (authoritativeWorkspace.users || []).find(
+      (u) => u.email.toLowerCase() === email.toLowerCase()
+    ) || (authoritativeWorkspace.users || [])[0];
+
+  if (!matchedUser) {
+    res.status(401).json({ error: 'Invalid credentials' });
+    return;
+  }
+  if (matchedUser.passwordHash && !verifyPassword(password, matchedUser.passwordHash)) {
+    res.status(401).json({ error: 'Invalid email or password' });
+    return;
+  }
+
+  const member = organizationRegistry[0]?.members.find(
+    (m) => m.userId === matchedUser.id
+  );
+  const orgRole = member?.role || 'ADMIN';
+  const accessToken = signJwtToken(
+    { sub: matchedUser.id, email: matchedUser.email, orgRole },
+    'access'
+  );
+  const refreshToken = signJwtToken({ sub: matchedUser.id }, 'refresh');
+  refreshTokenStore.set(refreshToken, matchedUser.id);
+
+  const { passwordHash: _ph, ...safeUser } = matchedUser;
+  res.json({
+    ok: true,
+    user: safeUser,
+    orgRole,
+    accessToken,
+    refreshToken,
+  });
 });
 
-app.post('/api/issues', async (req, res) => {
+app.post('/api/auth/refresh', (req, res) => {
+  const { refreshToken } = req.body || {};
+  const payload = verifyJwtToken(refreshToken, 'refresh');
+  if (!payload || !refreshTokenStore.has(refreshToken)) {
+    res.status(401).json({ error: 'Invalid or expired refresh token' });
+    return;
+  }
+  const user = (authoritativeWorkspace.users || []).find(
+    (u) => u.id === payload.sub
+  );
+  if (!user) {
+    res.status(401).json({ error: 'User not found' });
+    return;
+  }
+  const accessToken = signJwtToken(
+    { sub: user.id, email: user.email, orgRole: 'MEMBER' },
+    'access'
+  );
+  res.json({ ok: true, accessToken });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const { refreshToken } = req.body || {};
+  if (refreshToken) refreshTokenStore.delete(refreshToken);
+  res.json({ ok: true, message: 'Logged out successfully' });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const { user, orgRole } = resolveAuthenticatedUser(req);
+  const { passwordHash: _ph, ...safeUser } = user;
+  res.json({ user: safeUser, orgRole });
+});
+
+// --- Phase 1.2: Organizations & Members RBAC (Admin, Member, Viewer) ---
+app.get('/api/organizations', (_req, res) => {
+  res.json(organizationRegistry);
+});
+
+app.post('/api/organizations', requireRole(['ADMIN']), (req, res) => {
+  const parsed = OrganizationSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid organization payload', details: parsed.error.flatten() });
+    return;
+  }
+  const newOrg = {
+    id: `org-${Date.now()}`,
+    name: parsed.data.name,
+    slug: parsed.data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    domain: parsed.data.domain || 'enterprise.local',
+    plan: parsed.data.plan,
+    members: [{ userId: req.currentUser.id, role: 'ADMIN' }],
+  };
+  organizationRegistry.push(newOrg);
+  res.status(201).json(newOrg);
+});
+
+app.post('/api/organizations/:orgId/members', requireRole(['ADMIN']), (req, res) => {
+  const parsed = OrgMemberRoleSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid member role payload', details: parsed.error.flatten() });
+    return;
+  }
+  const org = organizationRegistry.find((o) => o.id === req.params.orgId) || organizationRegistry[0];
+  const existingIdx = org.members.findIndex((m) => m.userId === parsed.data.userId);
+  if (existingIdx >= 0) {
+    org.members[existingIdx].role = parsed.data.role;
+  } else {
+    org.members.push(parsed.data);
+  }
+  res.json({ ok: true, organization: org });
+});
+
+// --- Phase 1.3 & Phase 2.1: Projects & Configurable Workflows ---
+app.get('/api/projects', (req, res) => {
+  const list = (authoritativeWorkspace.projects || []).map((p) => ({
+    ...p,
+    workflowConfig: p.workflowConfig || {
+      statuses: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'QA', 'DONE'],
+      allowedTransitions: {
+        TODO: ['IN_PROGRESS', 'IN_REVIEW', 'QA', 'DONE'],
+        IN_PROGRESS: ['TODO', 'IN_REVIEW', 'QA', 'DONE'],
+        IN_REVIEW: ['TODO', 'IN_PROGRESS', 'QA', 'DONE'],
+        QA: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'],
+        DONE: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'QA'],
+      },
+    },
+  }));
+  if (req.query.page || req.query.limit) {
+    res.json(paginateArray(list, req.query));
+    return;
+  }
+  res.json(list);
+});
+
+app.post('/api/projects', requireRole(['ADMIN', 'MEMBER']), async (req, res) => {
+  const parsed = ProjectCreateSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+  const key = parsed.data.key.toUpperCase();
+  if ((authoritativeWorkspace.projects || []).some((p) => p.key === key)) {
+    res.status(409).json({ error: `Project with key "${key}" already exists.` });
+    return;
+  }
+  const newProject = {
+    id: `prj-${Date.now()}`,
+    key,
+    name: parsed.data.name,
+    description: parsed.data.description,
+    template: parsed.data.template,
+    leadId: req.currentUser.id,
+    issueCounter: 0,
+    sprintName: `${key} Sprint 1`,
+    sprintGoal: 'Initial project backlog & execution',
+    sprintStartDate: new Date().toISOString().slice(0, 10),
+    sprintEndDate: '2026-10-30',
+    workflowConfig: {
+      statuses: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'QA', 'DONE'],
+      allowedTransitions: {
+        TODO: ['IN_PROGRESS', 'IN_REVIEW', 'QA', 'DONE'],
+        IN_PROGRESS: ['TODO', 'IN_REVIEW', 'QA', 'DONE'],
+        IN_REVIEW: ['TODO', 'IN_PROGRESS', 'QA', 'DONE'],
+        QA: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'],
+        DONE: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'QA'],
+      },
+    },
+  };
+
+  await stateMutex.run(async () => {
+    authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+      type: 'project:created',
+      payload: { project: newProject },
+    });
+    serverRevision += 1;
+    await persistDatabaseToDisk();
+  });
+
+  res.status(201).json(newProject);
+});
+
+app.patch(
+  '/api/projects/:projectId/workflow',
+  requireRole(['ADMIN', 'MEMBER']),
+  async (req, res) => {
+    const parsed = WorkflowConfigSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid workflow configuration', details: parsed.error.flatten() });
+      return;
+    }
+    const { projectId } = req.params;
+    await stateMutex.run(async () => {
+      authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+        type: 'project:updated',
+        payload: {
+          projectId,
+          updates: { workflowConfig: parsed.data },
+        },
+      });
+      serverRevision += 1;
+      await persistDatabaseToDisk();
+    });
+    const updatedProj = (authoritativeWorkspace.projects || []).find(
+      (p) => p.id === projectId
+    );
+    res.json({ ok: true, project: updatedProj });
+  }
+);
+
+// --- Phase 1.4, 1.5 & Phase 2.3, 2.4, 2.5: Issues CRUD, Filters, Sorting & Pagination ---
+app.get('/api/issues', (req, res) => {
+  const {
+    projectId,
+    status,
+    priority,
+    assigneeId,
+    type,
+    label,
+    dueDate,
+    sprintId,
+    search,
+    sortBy = 'createdAt',
+    sortOrder = 'desc',
+    page,
+    limit,
+  } = req.query;
+
+  let list = [...(authoritativeWorkspace.issues || [])];
+
+  if (projectId) list = list.filter((i) => i.projectId === projectId);
+  if (status) list = list.filter((i) => i.status === String(status).toUpperCase());
+  if (priority) list = list.filter((i) => i.priority === String(priority).toUpperCase());
+  if (assigneeId) list = list.filter((i) => i.assigneeId === assigneeId);
+  if (type) list = list.filter((i) => i.type === String(type).toUpperCase());
+  if (sprintId) list = list.filter((i) => i.sprintId === sprintId);
+  if (dueDate) list = list.filter((i) => i.dueDate === dueDate);
+  if (label) {
+    const targetLabel = String(label).toLowerCase();
+    list = list.filter((i) =>
+      (i.labels || []).some((l) => String(l).toLowerCase() === targetLabel)
+    );
+  }
+  if (search) {
+    const q = String(search).toLowerCase().trim();
+    list = list.filter(
+      (i) =>
+        (i.key || '').toLowerCase().includes(q) ||
+        (i.title || '').toLowerCase().includes(q) ||
+        (i.description || '').toLowerCase().includes(q)
+    );
+  }
+
+  list.sort((a, b) => {
+    const dir = String(sortOrder).toLowerCase() === 'asc' ? 1 : -1;
+    const valA = a[sortBy] ?? '';
+    const valB = b[sortBy] ?? '';
+    if (valA < valB) return -1 * dir;
+    if (valA > valB) return 1 * dir;
+    return 0;
+  });
+
+  if (page || limit) {
+    res.json(paginateArray(list, { page, limit }));
+    return;
+  }
+  res.json(list);
+});
+
+app.get('/api/issues/:idOrKey', (req, res) => {
+  const param = req.params.idOrKey;
+  const issue = (authoritativeWorkspace.issues || []).find(
+    (i) => i.id === param || (i.key && i.key.toUpperCase() === param.toUpperCase())
+  );
+  if (!issue) {
+    res.status(404).json({ error: `Issue "${param}" not found` });
+    return;
+  }
+  res.json(issue);
+});
+
+app.post('/api/issues', requireRole(['ADMIN', 'MEMBER']), async (req, res) => {
   try {
     const body = req.body || {};
+    const parsed = IssueCreateSchema.safeParse({
+      ...body,
+      storyPoints: body.storyPoints !== undefined ? Number(body.storyPoints) : 0,
+      originalEstimateHours:
+        body.originalEstimateHours !== undefined
+          ? Number(body.originalEstimateHours)
+          : 0,
+    });
+
+    if (!parsed.success) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const v = parsed.data;
     const targetProj =
-      authoritativeWorkspace.projects.find((p) => p.id === body.projectId) ||
+      authoritativeWorkspace.projects.find((p) => p.id === v.projectId) ||
       authoritativeWorkspace.projects[0];
     const nextCounter = (targetProj?.issueCounter || 100) + 1;
     const activeSp = authoritativeWorkspace.sprints.find(
       (s) => s.projectId === targetProj.id && s.status === SprintStatus.ACTIVE
     );
     const now = new Date().toISOString();
+    const normalizedPrio = v.priority === 'CRITICAL' ? 'HIGHEST' : v.priority;
+
     const newIssue = {
       id: body.id || `iss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       projectId: targetProj.id,
-      key: body.key || `${targetProj.key}-${nextCounter}`,
-      title: body.title || 'Untitled Story',
-      description: body.description || '',
-      type: body.type || 'STORY',
-      status: body.status || IssueStatus.TODO,
-      priority: body.priority || 'MEDIUM',
-      assigneeId: body.assigneeId || authoritativeWorkspace.currentUserId || 'usr-1',
-      reporterId: body.reporterId || authoritativeWorkspace.currentUserId || 'usr-1',
-      epicId: body.epicId || null,
-      sprintId: body.sprintId || (activeSp ? activeSp.id : null),
-      storyPoints: Number(body.storyPoints ?? 5),
-      originalEstimateHours: Number(body.originalEstimateHours ?? 12),
+      key: v.key || `${targetProj.key}-${nextCounter}`,
+      title: v.title,
+      description: v.description || '',
+      userStory: v.userStory || '',
+      scopeDescription: v.scopeDescription || '',
+      acceptanceCriteria: v.acceptanceCriteria || [],
+      testCases: v.testCases || [],
+      definitionOfDone: v.definitionOfDone || [],
+      type: v.type || 'STORY',
+      status: v.status || IssueStatus.TODO,
+      priority: normalizedPrio || 'MEDIUM',
+      assigneeId:
+        v.assigneeId !== undefined
+          ? v.assigneeId
+          : req.currentUser?.id || authoritativeWorkspace.currentUserId || 'usr-1',
+      reporterId:
+        v.reporterId ||
+        req.currentUser?.id ||
+        authoritativeWorkspace.currentUserId ||
+        'usr-1',
+      epicId: v.epicId || null,
+      sprintId: v.sprintId !== undefined ? v.sprintId : activeSp ? activeSp.id : null,
+      storyPoints: Number(v.storyPoints ?? 0),
+      originalEstimateHours: Number(v.originalEstimateHours ?? 0),
       timeSpentHours: 0,
-      remainingEstimateHours: Number(body.originalEstimateHours ?? 12),
-      labels: Array.isArray(body.labels) ? body.labels : ['story'],
+      remainingEstimateHours: Number(v.originalEstimateHours ?? 0),
+      labels: Array.isArray(v.labels) ? v.labels : [],
       componentId: body.componentId || null,
       fixVersionId: body.fixVersionId || null,
       startDate: now.slice(0, 10),
-      dueDate: body.dueDate || '2026-10-22',
-      subtasks: Array.isArray(body.subtasks) ? body.subtasks : [],
+      dueDate: v.dueDate || '',
+      subtasks: Array.isArray(v.subtasks) ? v.subtasks : [],
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       links: [],
       comments: [],
       workLogs: [],
-      history: [],
-      watcherIds: [authoritativeWorkspace.currentUserId || 'usr-1'],
+      history: [
+        {
+          id: `hst-${Date.now()}`,
+          actorId: req.currentUser?.id || 'usr-1',
+          field: 'created',
+          oldValue: 'None',
+          newValue: v.status || 'TODO',
+          timestamp: now,
+        },
+      ],
+      watcherIds: [req.currentUser?.id || authoritativeWorkspace.currentUserId || 'usr-1'],
       createdAt: now,
       updatedAt: now,
       order: authoritativeWorkspace.issues.length + 1,
@@ -720,18 +1345,605 @@ app.post('/api/issues', async (req, res) => {
       collaborators: getActiveCollaborators(),
     });
 
-    res.json({ ok: true, issue: newIssue, workspace: result.workspace });
+    res.status(201).json({ ok: true, issue: newIssue, workspace: result.workspace });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create issue' });
   }
 });
 
-app.get('/api/users', (_req, res) => {
-  res.json(authoritativeWorkspace.users || []);
+app.patch('/api/issues/:id', requireRole(['ADMIN', 'MEMBER']), async (req, res) => {
+  const issueId = req.params.id;
+  const existing = (authoritativeWorkspace.issues || []).find(
+    (i) => i.id === issueId || i.key === issueId
+  );
+  if (!existing) {
+    res.status(404).json({ error: 'Issue not found' });
+    return;
+  }
+
+  const parsed = IssueUpdateSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid update fields', details: parsed.error.flatten() });
+    return;
+  }
+
+  // Enforce project workflow allowedTransitions if configured
+  if (parsed.data.status && parsed.data.status !== existing.status) {
+    const proj = (authoritativeWorkspace.projects || []).find(
+      (p) => p.id === existing.projectId
+    );
+    const allowed = proj?.workflowConfig?.allowedTransitions?.[existing.status];
+    if (Array.isArray(allowed) && !allowed.includes(parsed.data.status)) {
+      res.status(422).json({
+        error: `Workflow transition from "${existing.status}" to "${parsed.data.status}" is not permitted in project ${proj.key}.`,
+      });
+      return;
+    }
+  }
+
+  const result = await stateMutex.run(async () => {
+    authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+      type: 'issue:updated',
+      payload: {
+        issueId: existing.id,
+        updates: parsed.data,
+        actorId: req.currentUser?.id || 'usr-1',
+      },
+    });
+    serverRevision += 1;
+    await persistDatabaseToDisk();
+    return { workspace: authoritativeWorkspace, revision: serverRevision };
+  });
+
+  const updatedIssue = result.workspace.issues.find((i) => i.id === existing.id);
+
+  // Notify watchers
+  (existing.watcherIds || []).forEach((wUserId) => {
+    inAppNotifications.unshift({
+      id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      userId: wUserId,
+      issueId: existing.id,
+      issueKey: existing.key,
+      category: 'STATUS_CHANGE',
+      title: `${existing.key} updated by ${req.currentUser?.name || 'Team Member'}`,
+      message: `Updated ${Object.keys(parsed.data).join(', ')} on ${existing.title}`,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  broadcastEvent('workspace:sync', {
+    workspace: result.workspace,
+    revision: result.revision,
+    collaborators: getActiveCollaborators(),
+  });
+
+  res.json({ ok: true, issue: updatedIssue });
 });
 
-app.get('/api/sprints', (_req, res) => {
-  res.json(authoritativeWorkspace.sprints || []);
+app.delete('/api/issues/:id', requireRole(['ADMIN', 'MEMBER']), async (req, res) => {
+  const issueId = req.params.id;
+  const existing = (authoritativeWorkspace.issues || []).find(
+    (i) => i.id === issueId || i.key === issueId
+  );
+  if (!existing) {
+    res.status(404).json({ error: 'Issue not found' });
+    return;
+  }
+
+  const result = await stateMutex.run(async () => {
+    authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+      type: 'issue:deleted',
+      payload: { issueId: existing.id },
+    });
+    serverRevision += 1;
+    await persistDatabaseToDisk();
+    return { workspace: authoritativeWorkspace, revision: serverRevision };
+  });
+
+  broadcastEvent('workspace:sync', {
+    workspace: result.workspace,
+    revision: result.revision,
+    collaborators: getActiveCollaborators(),
+  });
+
+  res.json({ ok: true, deletedId: existing.id });
+});
+
+// --- Phase 3: Collaboration (Comments with @Mentions, Activity Log, Attachments, Watchers, Links) ---
+app.post(
+  '/api/issues/:id/comments',
+  requireRole(['ADMIN', 'MEMBER']),
+  async (req, res) => {
+    const parsed = CommentCreateSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Comment body is required', details: parsed.error.flatten() });
+      return;
+    }
+    const existing = (authoritativeWorkspace.issues || []).find(
+      (i) => i.id === req.params.id || i.key === req.params.id
+    );
+    if (!existing) {
+      res.status(404).json({ error: 'Issue not found' });
+      return;
+    }
+
+    const mentions = Array.from(
+      parsed.data.body.matchAll(/@([a-zA-Z0-9._-]+)/g),
+      (m) => m[1]
+    );
+
+    const newComment = {
+      id: `cmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      authorId: parsed.data.authorId || req.currentUser?.id || 'usr-1',
+      body: parsed.data.body,
+      mentions,
+      createdAt: new Date().toISOString(),
+    };
+
+    const result = await stateMutex.run(async () => {
+      authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+        type: 'issue:comment_added',
+        payload: { issueId: existing.id, comment: newComment },
+      });
+      serverRevision += 1;
+      await persistDatabaseToDisk();
+      return { workspace: authoritativeWorkspace, revision: serverRevision };
+    });
+
+    // Notify @mentioned users
+    mentions.forEach((mentionToken) => {
+      const targetUser = (authoritativeWorkspace.users || []).find(
+        (u) =>
+          u.name.toLowerCase().includes(mentionToken.toLowerCase()) ||
+          (u.username || '').toLowerCase() === mentionToken.toLowerCase()
+      );
+      if (targetUser) {
+        inAppNotifications.unshift({
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          userId: targetUser.id,
+          issueId: existing.id,
+          issueKey: existing.key,
+          category: 'MENTION',
+          title: `@${targetUser.name} mentioned on ${existing.key}`,
+          message: newComment.body,
+          read: false,
+          createdAt: newComment.createdAt,
+        });
+      }
+    });
+
+    broadcastEvent('workspace:sync', {
+      workspace: result.workspace,
+      revision: result.revision,
+      collaborators: getActiveCollaborators(),
+    });
+
+    res.status(201).json({ ok: true, comment: newComment });
+  }
+);
+
+app.get('/api/issues/:id/activity', (req, res) => {
+  const existing = (authoritativeWorkspace.issues || []).find(
+    (i) => i.id === req.params.id || i.key === req.params.id
+  );
+  if (!existing) {
+    res.status(404).json({ error: 'Issue not found' });
+    return;
+  }
+  res.json(existing.history || []);
+});
+
+app.post(
+  '/api/issues/:id/attachments',
+  requireRole(['ADMIN', 'MEMBER']),
+  async (req, res) => {
+    const parsed = AttachmentUploadSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      res.status(400).json({
+        error: 'Attachment validation failed (check size <= 10MB and allowed MIME type)',
+        details: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+    const existing = (authoritativeWorkspace.issues || []).find(
+      (i) => i.id === req.params.id || i.key === req.params.id
+    );
+    if (!existing) {
+      res.status(404).json({ error: 'Issue not found' });
+      return;
+    }
+
+    const newAtt = {
+      id: `att-${Date.now()}`,
+      name: parsed.data.fileName,
+      mimeType: parsed.data.mimeType,
+      sizeBytes: parsed.data.sizeBytes,
+      size: `${Math.max(1, Math.round(parsed.data.sizeBytes / 1024))} KB`,
+      uploadedAt: new Date().toISOString().slice(0, 10),
+    };
+
+    const nextAttachments = [...(existing.attachments || []), newAtt];
+    await stateMutex.run(async () => {
+      authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+        type: 'issue:updated',
+        payload: {
+          issueId: existing.id,
+          updates: { attachments: nextAttachments },
+          actorId: req.currentUser?.id || 'usr-1',
+        },
+      });
+      serverRevision += 1;
+      await persistDatabaseToDisk();
+    });
+
+    res.status(201).json({ ok: true, attachment: newAtt });
+  }
+);
+
+app.post(
+  '/api/issues/:id/watchers',
+  requireRole(['ADMIN', 'MEMBER', 'VIEWER']),
+  async (req, res) => {
+    const existing = (authoritativeWorkspace.issues || []).find(
+      (i) => i.id === req.params.id || i.key === req.params.id
+    );
+    if (!existing) {
+      res.status(404).json({ error: 'Issue not found' });
+      return;
+    }
+    const userId = req.body?.userId || req.currentUser?.id || 'usr-1';
+    const currentWatchers = existing.watcherIds || [];
+    const nextWatchers = currentWatchers.includes(userId)
+      ? currentWatchers.filter((id) => id !== userId)
+      : [...currentWatchers, userId];
+
+    await stateMutex.run(async () => {
+      authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+        type: 'issue:updated',
+        payload: {
+          issueId: existing.id,
+          updates: { watcherIds: nextWatchers },
+          actorId: userId,
+        },
+      });
+      serverRevision += 1;
+      await persistDatabaseToDisk();
+    });
+
+    res.json({ ok: true, watcherIds: nextWatchers });
+  }
+);
+
+app.post(
+  '/api/issues/:id/links',
+  requireRole(['ADMIN', 'MEMBER']),
+  async (req, res) => {
+    const parsed = IssueLinkCreateSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid issue link payload', details: parsed.error.flatten() });
+      return;
+    }
+    const existing = (authoritativeWorkspace.issues || []).find(
+      (i) => i.id === req.params.id || i.key === req.params.id
+    );
+    if (!existing) {
+      res.status(404).json({ error: 'Source issue not found' });
+      return;
+    }
+
+    const newLink = {
+      id: `lnk-${Date.now()}`,
+      type: parsed.data.linkType,
+      targetIssueKey: parsed.data.targetIssueKey.toUpperCase(),
+    };
+    const nextLinks = [...(existing.links || []), newLink];
+
+    await stateMutex.run(async () => {
+      authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+        type: 'issue:updated',
+        payload: {
+          issueId: existing.id,
+          updates: { links: nextLinks },
+          actorId: req.currentUser?.id || 'usr-1',
+        },
+      });
+      serverRevision += 1;
+      await persistDatabaseToDisk();
+    });
+
+    res.status(201).json({ ok: true, link: newLink, links: nextLinks });
+  }
+);
+
+const emailOutboxQueue = [
+  {
+    id: 'eml-seed-1',
+    to: 'arjun.mehta@arij.dev',
+    recipientName: 'Arjun Mehta',
+    issueKey: 'KP-6453',
+    category: 'MENTION',
+    subject: '[Arij · KP-6453] @Arjun mentioned in Automation Test for Vulnerabilities List',
+    body: 'Priya Sharma mentioned @Arjun on KP-6453: "Playwright selectors for /vulnerabilities table, CVE search input, and Severity filter verified in CI."',
+    status: 'DELIVERED',
+    sentAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+  },
+  {
+    id: 'eml-seed-2',
+    to: 'priya.sharma@arij.dev',
+    recipientName: 'Priya Sharma',
+    issueKey: 'KP-6453',
+    category: 'STATUS_CHANGE',
+    subject: '[Arij · KP-6453] Watcher Alert: Status updated on Vulnerabilities List Story',
+    body: 'You are watching KP-6453. Subtasks KP-6453-1 through KP-6453-8 and Acceptance Criteria Scenarios 1–4 are active in sprint.',
+    status: 'DELIVERED',
+    sentAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+  },
+];
+
+app.get('/api/notifications', (req, res) => {
+  const { user } = resolveAuthenticatedUser(req);
+  const userNotifs = inAppNotifications.filter(
+    (n) => !n.userId || n.userId === user.id
+  );
+  res.json(userNotifs);
+});
+
+app.patch('/api/notifications/read-all', (_req, res) => {
+  inAppNotifications.forEach((n) => {
+    n.read = true;
+  });
+  res.json({ ok: true });
+});
+
+app.get('/api/notifications/emails', (_req, res) => {
+  res.json({
+    ok: true,
+    total: emailOutboxQueue.length,
+    emails: emailOutboxQueue,
+  });
+});
+
+app.post('/api/notifications/send-email', (req, res) => {
+  const { to, recipientName, issueKey, subject, body, category } = req.body || {};
+  if (!to || !subject) {
+    res.status(400).json({ error: 'Recipient email (to) and subject are required' });
+    return;
+  }
+  const emailRecord = {
+    id: `eml-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    to: String(to).trim(),
+    recipientName: recipientName || String(to).split('@')[0],
+    issueKey: issueKey || 'KP-6453',
+    category: category || 'DIGEST',
+    subject: String(subject).trim(),
+    body:
+      String(body || '').trim() ||
+      'Automated Arij notification digest for active sprint issues and @mentions.',
+    status: 'DELIVERED',
+    sentAt: new Date().toISOString(),
+  };
+  emailOutboxQueue.unshift(emailRecord);
+  res.status(201).json({ ok: true, email: emailRecord });
+});
+
+// --- Phase 2.5: Global Search by Key, Title, or Markdown Text ---
+app.get('/api/search', (req, res) => {
+  const q = String(req.query.q || '').toLowerCase().trim();
+  if (!q) {
+    res.json(paginateArray(authoritativeWorkspace.issues || [], req.query));
+    return;
+  }
+  const matches = (authoritativeWorkspace.issues || []).filter(
+    (i) =>
+      (i.key || '').toLowerCase().includes(q) ||
+      (i.title || '').toLowerCase().includes(q) ||
+      (i.description || '').toLowerCase().includes(q)
+  );
+  res.json(paginateArray(matches, req.query));
+});
+
+// --- Phase 4: Planning (Sprints Lifecycle, Epics Progress, Reports) ---
+app.get('/api/users', (req, res) => {
+  const users = (authoritativeWorkspace.users || []).map(
+    ({ passwordHash: _ph, ...u }) => u
+  );
+  if (req.query.page || req.query.limit) {
+    res.json(paginateArray(users, req.query));
+    return;
+  }
+  res.json(users);
+});
+
+app.get('/api/sprints', (req, res) => {
+  let list = authoritativeWorkspace.sprints || [];
+  if (req.query.projectId) {
+    list = list.filter((s) => s.projectId === req.query.projectId);
+  }
+  if (req.query.page || req.query.limit) {
+    res.json(paginateArray(list, req.query));
+    return;
+  }
+  res.json(list);
+});
+
+app.post('/api/sprints', requireRole(['ADMIN', 'MEMBER']), async (req, res) => {
+  const parsed = SprintCreateSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid sprint payload', details: parsed.error.flatten() });
+    return;
+  }
+  const newSprint = {
+    id: `spr-${Date.now()}`,
+    projectId: parsed.data.projectId,
+    name: parsed.data.name,
+    goal: parsed.data.goal,
+    status: SprintStatus.PLANNED,
+    startDate: parsed.data.startDate || new Date().toISOString().slice(0, 10),
+    endDate: parsed.data.endDate || '2026-10-30',
+  };
+  await stateMutex.run(async () => {
+    authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+      type: 'sprint:created',
+      payload: { sprint: newSprint },
+    });
+    serverRevision += 1;
+    await persistDatabaseToDisk();
+  });
+  res.status(201).json(newSprint);
+});
+
+app.post(
+  '/api/sprints/:id/start',
+  requireRole(['ADMIN', 'MEMBER']),
+  async (req, res) => {
+    const sprintId = req.params.id;
+    const sp = (authoritativeWorkspace.sprints || []).find((s) => s.id === sprintId);
+    if (!sp) {
+      res.status(404).json({ error: 'Sprint not found' });
+      return;
+    }
+    await stateMutex.run(async () => {
+      authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+        type: 'sprint:started',
+        payload: {
+          sprintId,
+          projectId: sp.projectId,
+          updates: req.body || {},
+        },
+      });
+      serverRevision += 1;
+      await persistDatabaseToDisk();
+    });
+    const updated = authoritativeWorkspace.sprints.find((s) => s.id === sprintId);
+    res.json({ ok: true, sprint: updated });
+  }
+);
+
+app.post(
+  '/api/sprints/:id/complete',
+  requireRole(['ADMIN', 'MEMBER']),
+  async (req, res) => {
+    const sprintId = req.params.id;
+    const sp = (authoritativeWorkspace.sprints || []).find((s) => s.id === sprintId);
+    if (!sp) {
+      res.status(404).json({ error: 'Sprint not found' });
+      return;
+    }
+    const sprintIssues = (authoritativeWorkspace.issues || []).filter(
+      (i) => i.sprintId === sprintId
+    );
+    const committedPoints = sprintIssues.reduce(
+      (s, i) => s + (i.storyPoints || 0),
+      0
+    );
+    const completedPoints = sprintIssues
+      .filter((i) => i.status === 'DONE')
+      .reduce((s, i) => s + (i.storyPoints || 0), 0);
+
+    await stateMutex.run(async () => {
+      authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+        type: 'sprint:completed',
+        payload: {
+          sprintId,
+          destinationSprintId: req.body?.destinationSprintId || null,
+          committedPoints,
+          completedPoints,
+        },
+      });
+      serverRevision += 1;
+      await persistDatabaseToDisk();
+    });
+
+    res.json({
+      ok: true,
+      committedPoints,
+      completedPoints,
+    });
+  }
+);
+
+app.get('/api/reports/summary', (req, res) => {
+  const projectId = req.query.projectId || authoritativeWorkspace.activeProjectId;
+  const issues = (authoritativeWorkspace.issues || []).filter(
+    (i) => !projectId || i.projectId === projectId
+  );
+  const createdCount = issues.length;
+  const resolvedCount = issues.filter((i) => i.status === 'DONE').length;
+
+  const workloadByAssignee = (authoritativeWorkspace.users || []).map((u) => {
+    const userIssues = issues.filter((i) => i.assigneeId === u.id);
+    return {
+      userId: u.id,
+      name: u.name,
+      totalIssues: userIssues.length,
+      doneIssues: userIssues.filter((i) => i.status === 'DONE').length,
+      storyPoints: userIssues.reduce((s, i) => s + (i.storyPoints || 0), 0),
+    };
+  });
+
+  const epics = issues.filter((i) => i.type === 'EPIC');
+  const epicProgress = epics.map((ep) => {
+    const children = issues.filter(
+      (i) => i.epicId === ep.id || i.parentKey === ep.key
+    );
+    const doneChildren = children.filter((c) => c.status === 'DONE').length;
+    return {
+      epicId: ep.id,
+      key: ep.key,
+      title: ep.title,
+      totalChildren: children.length,
+      doneChildren,
+      progressPercent:
+        children.length > 0
+          ? Math.round((doneChildren / children.length) * 100)
+          : 0,
+    };
+  });
+
+  res.json({
+    projectId,
+    createdVsResolved: { created: createdCount, resolved: resolvedCount },
+    workloadByAssignee,
+    workloadPerAssignee: workloadByAssignee,
+    epicProgress,
+  });
+});
+
+// --- Phase 5: Saved Filters & OpenAPI 3.1 Docs ---
+app.get('/api/saved-filters', (_req, res) => {
+  res.json(authoritativeWorkspace.savedFilters || []);
+});
+
+app.post(
+  '/api/saved-filters',
+  requireRole(['ADMIN', 'MEMBER', 'VIEWER']),
+  async (req, res) => {
+    const parsed = SavedFilterSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid filter payload', details: parsed.error.flatten() });
+      return;
+    }
+    const newFilter = {
+      id: `flt-${Date.now()}`,
+      name: parsed.data.name,
+      projectId: parsed.data.projectId || authoritativeWorkspace.activeProjectId,
+      query: parsed.data.query,
+    };
+    await stateMutex.run(async () => {
+      authoritativeWorkspace = applyMutationEvent(authoritativeWorkspace, {
+        type: 'filter:saved',
+        payload: { filter: newFilter },
+      });
+      serverRevision += 1;
+      await persistDatabaseToDisk();
+    });
+    res.status(201).json(newFilter);
+  }
+);
+
+app.get('/api/docs/openapi.json', (_req, res) => {
+  res.json(ARIJ_OPENAPI_SPEC);
 });
 
 app.get('/api/boards', (_req, res) => {
@@ -847,116 +2059,348 @@ app.post('/api/arij/ai-generate-issue', async (req, res) => {
 // ============================================================================
 // STORY PDF AUTO-EXTRACTOR (Extracts Title, Description, Points, Subtasks, etc. from PDF)
 // ============================================================================
+function decodePdfLiteralString(str) {
+  return str
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\\(/g, '(')
+    .replace(/\\\)/g, ')')
+    .replace(/\\\\/g, '\\')
+    .replace(/\\([0-7]{1,3})/g, (_, oct) =>
+      String.fromCharCode(parseInt(oct, 8))
+    );
+}
+
+function decodeHexToUtf8(hexStr, glyphMap) {
+  const cleanHex = hexStr.replace(/\s+/g, '');
+  if (!cleanHex) return '';
+
+  // UTF-16BE BOM check
+  if (/^feff/i.test(cleanHex)) {
+    let out = '';
+    for (let i = 4; i + 3 < cleanHex.length; i += 4) {
+      const code = parseInt(cleanHex.slice(i, i + 4), 16);
+      if (!Number.isNaN(code) && code >= 32) {
+        out += String.fromCharCode(code);
+      }
+    }
+    return out;
+  }
+
+  // Try 4-hex-digit (2-byte CID) lookup in glyphMap first
+  if (glyphMap && glyphMap.size > 0 && cleanHex.length % 4 === 0) {
+    let mappedOut = '';
+    let mappedHits = 0;
+    for (let i = 0; i < cleanHex.length; i += 4) {
+      const gid = cleanHex.slice(i, i + 4).toUpperCase();
+      if (glyphMap.has(gid)) {
+        mappedOut += glyphMap.get(gid);
+        mappedHits += 1;
+      }
+    }
+    if (mappedHits > 0) {
+      return mappedOut;
+    }
+  }
+
+  // Try 2-hex-digit lookup in glyphMap
+  if (glyphMap && glyphMap.size > 0 && cleanHex.length % 2 === 0) {
+    let mappedOut = '';
+    let mappedHits = 0;
+    for (let i = 0; i < cleanHex.length; i += 2) {
+      const gid = cleanHex.slice(i, i + 2).toUpperCase();
+      if (glyphMap.has(gid)) {
+        mappedOut += glyphMap.get(gid);
+        mappedHits += 1;
+      }
+    }
+    if (mappedHits > 0) {
+      return mappedOut;
+    }
+  }
+
+  return '';
+}
+
 function extractReadableTextFromPdfBase64(base64Data) {
   try {
     const buf = Buffer.from(base64Data || '', 'base64');
+    if (buf.length === 0) return '';
+
     const rawLatin = buf.toString('latin1');
-    // Extract literal strings inside PDF parentheses (...) and readable ASCII runs
-    const literalMatches = [];
-    const parenRegex = /\(([^()\\]{3,200})\)/g;
-    let m;
-    while ((m = parenRegex.exec(rawLatin)) !== null) {
-      const cleaned = m[1].replace(/[^\x20-\x7E]/g, ' ').trim();
-      if (cleaned.length >= 3 && /[a-zA-Z]{2,}/.test(cleaned)) {
-        literalMatches.push(cleaned);
+    if (!rawLatin.startsWith('%PDF')) {
+      // Plain text / markdown file
+      return buf
+        .toString('utf8')
+        .replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\u024F\u2010-\u2027]/g, ' ')
+        .trim()
+        .slice(0, 24000);
+    }
+
+    // 1. Decompress all FlateDecode streams in the PDF
+    const decompressedStreams = [];
+    const glyphMap = new Map();
+    let searchPos = 0;
+
+    while (searchPos < rawLatin.length) {
+      const streamIdx = rawLatin.indexOf('stream', searchPos);
+      if (streamIdx === -1) break;
+      const endStreamIdx = rawLatin.indexOf('endstream', streamIdx + 6);
+      if (endStreamIdx === -1) break;
+
+      let dataStart = streamIdx + 6;
+      if (rawLatin[dataStart] === '\r' && rawLatin[dataStart + 1] === '\n') {
+        dataStart += 2;
+      } else if (rawLatin[dataStart] === '\n' || rawLatin[dataStart] === '\r') {
+        dataStart += 1;
+      }
+
+      let dataEnd = endStreamIdx;
+      while (
+        dataEnd > dataStart &&
+        (rawLatin[dataEnd - 1] === '\n' || rawLatin[dataEnd - 1] === '\r')
+      ) {
+        dataEnd -= 1;
+      }
+
+      const sliceBuf = buf.subarray(dataStart, dataEnd);
+      if (sliceBuf.length > 0 && sliceBuf.length < 5 * 1024 * 1024) {
+        let inflated = null;
+        try {
+          inflated = zlib.inflateSync(sliceBuf);
+        } catch {
+          try {
+            inflated = zlib.inflateRawSync(sliceBuf);
+          } catch {
+            // Uncompressed stream
+          }
+        }
+        if (inflated) {
+          const streamStr = inflated.toString('latin1');
+          decompressedStreams.push(streamStr);
+
+          // Parse /ToUnicode CMap tables (beginbfchar / beginbfrange) used by Chrome Skia/PDF
+          if (
+            streamStr.includes('beginbfchar') ||
+            streamStr.includes('beginbfrange')
+          ) {
+            const bfCharRegex = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g;
+            let cm;
+            while ((cm = bfCharRegex.exec(streamStr)) !== null) {
+              const srcKey = cm[1].toUpperCase();
+              const dstHex = cm[2];
+              let uniStr = '';
+              for (let i = 0; i + 3 < dstHex.length; i += 4) {
+                const cp = parseInt(dstHex.slice(i, i + 4), 16);
+                if (!Number.isNaN(cp) && cp >= 32) {
+                  uniStr += String.fromCharCode(cp);
+                }
+              }
+              if (uniStr) {
+                glyphMap.set(srcKey, uniStr);
+              }
+            }
+
+            const bfRangeRegex =
+              /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g;
+            let rm;
+            while ((rm = bfRangeRegex.exec(streamStr)) !== null) {
+              const startGid = parseInt(rm[1], 16);
+              const endGid = parseInt(rm[2], 16);
+              const startUni = parseInt(rm[3], 16);
+              const padLen = rm[1].length;
+              if (
+                !Number.isNaN(startGid) &&
+                !Number.isNaN(endGid) &&
+                !Number.isNaN(startUni) &&
+                endGid >= startGid &&
+                endGid - startGid <= 512
+              ) {
+                for (let g = startGid; g <= endGid; g += 1) {
+                  const keyHex = g
+                    .toString(16)
+                    .toUpperCase()
+                    .padStart(padLen, '0');
+                  const uniCp = startUni + (g - startGid);
+                  if (uniCp >= 32) {
+                    glyphMap.set(keyHex, String.fromCharCode(uniCp));
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      searchPos = endStreamIdx + 9;
+    }
+
+    const extractedLines = [];
+
+    // 2. Extract /Title from PDF Info dictionary if present
+    const titleParenMatch = rawLatin.match(/\/Title\s*\(([^()\\]*(?:\\.[^()\\]*)*)\)/);
+    if (titleParenMatch) {
+      const t = decodePdfLiteralString(titleParenMatch[1]).trim();
+      if (t && !/^(untitled|microsoft|skia)/i.test(t)) {
+        extractedLines.push(t);
       }
     }
-    if (literalMatches.length > 0) {
-      return literalMatches.join('\n').slice(0, 12000);
+    const titleHexMatch = rawLatin.match(/\/Title\s*<([0-9A-Fa-f\s]+)>/);
+    if (titleHexMatch) {
+      const t = decodeHexToUtf8(titleHexMatch[1], glyphMap).trim();
+      if (t) {
+        extractedLines.push(t);
+      }
     }
-    // Fallback for plain text / markdown files uploaded alongside PDFs
-    const utf8Text = buf
-      .toString('utf8')
-      .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, ' ')
-      .replace(/\s{3,}/g, '\n')
+
+    // 3. Extract text from decompressed content streams (BT ... ET blocks)
+    for (const s of decompressedStreams) {
+      if (s.includes('beginbfchar') || s.includes('beginbfrange')) continue;
+      let lineBuf = '';
+      const tokenRegex =
+        /\[([^\]]+)\]\s*TJ|\(([^()\\]*(?:\\.[^()\\]*)*)\)\s*Tj|<([0-9A-Fa-f\s]+)>\s*Tj|\b(Td|TD|T\*|ET)\b/g;
+      let tm;
+      while ((tm = tokenRegex.exec(s)) !== null) {
+        if (tm[1]) {
+          // TJ array
+          const arrContent = tm[1];
+          const subRegex =
+            /\(([^()\\]*(?:\\.[^()\\]*)*)\)|<([0-9A-Fa-f\s]+)>|(-?\d+(?:\.\d+)?)/g;
+          let sm;
+          while ((sm = subRegex.exec(arrContent)) !== null) {
+            if (sm[1] !== undefined) {
+              lineBuf += decodePdfLiteralString(sm[1]);
+            } else if (sm[2] !== undefined) {
+              lineBuf += decodeHexToUtf8(sm[2], glyphMap);
+            } else if (sm[3] !== undefined) {
+              const kern = parseFloat(sm[3]);
+              if (kern < -120 && !lineBuf.endsWith(' ')) {
+                lineBuf += ' ';
+              }
+            }
+          }
+        } else if (tm[2] !== undefined) {
+          lineBuf += decodePdfLiteralString(tm[2]);
+        } else if (tm[3] !== undefined) {
+          lineBuf += decodeHexToUtf8(tm[3], glyphMap);
+        } else if (tm[4]) {
+          const cleaned = lineBuf.replace(/\s+/g, ' ').trim();
+          if (cleaned.length >= 2) {
+            extractedLines.push(cleaned);
+          }
+          lineBuf = '';
+        }
+      }
+      const leftover = lineBuf.replace(/\s+/g, ' ').trim();
+      if (leftover.length >= 2) {
+        extractedLines.push(leftover);
+      }
+    }
+
+    const joined = extractedLines
+      .filter(
+        (l) =>
+          l.length >= 2 &&
+          /[a-zA-Z]{2,}/.test(l) &&
+          !/^(Skia\/PDF|Mozilla\/5\.0|Chromium|endstream|endobj)$/i.test(l)
+      )
+      .join('\n')
       .trim();
-    return utf8Text.slice(0, 12000);
+
+    return joined.slice(0, 24000);
   } catch {
     return '';
   }
 }
 
-function buildFallbackStoryFromText(fileName, rawText, projectKey = 'KAW') {
-  const cleanName = (fileName || 'user-story-specification.pdf')
-    .replace(/\.[^.]+$/, '')
-    .replace(/[-_]+/g, ' ')
-    .trim();
+function normalizeJiraStatus(rawStatus = '') {
+  const s = String(rawStatus).toUpperCase().trim();
+  if (s.includes('PROGRESS') || s === 'IN_PROGRESS') return 'IN_PROGRESS';
+  if (s.includes('REVIEW') || s === 'IN_REVIEW') return 'IN_REVIEW';
+  if (s.includes('QA') || s.includes('TEST')) return 'QA';
+  if (s.includes('DONE') || s.includes('RESOLVED') || s.includes('CLOSED')) {
+    return 'DONE';
+  }
+  return 'TODO';
+}
 
-  const lines = (rawText || '')
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 2 && !/^%PDF|obj|endobj|stream|endstream|xref/i.test(l));
+function normalizeJiraPriority(rawPriority = '') {
+  const p = String(rawPriority).toUpperCase().trim();
+  if (p.includes('HIGHEST') || p.includes('CRITICAL') || p === 'P0') {
+    return 'HIGHEST';
+  }
+  if (p.includes('HIGH') || p === 'P1') return 'HIGH';
+  if (p.includes('LOWEST') || p.includes('TRIVIAL') || p === 'P4') {
+    return 'LOWEST';
+  }
+  if (p.includes('LOW') || p === 'P3') return 'LOW';
+  return 'MEDIUM';
+}
 
-  // Detect explicit Title / Summary if present
-  const titleLine =
-    lines.find((l) => /^(title|summary|story|feature)\s*:/i.test(l)) ||
-    lines[0] ||
-    cleanName;
-  const parsedTitle = titleLine
-    .replace(/^(title|summary|story|feature)\s*:\s*/i, '')
-    .trim();
+function computeInitialsFromName(name = '') {
+  const parts = String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return 'SM';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
 
-  const finalTitle =
-    parsedTitle.length >= 4
-      ? parsedTitle.charAt(0).toUpperCase() + parsedTitle.slice(1)
-      : `Implement ${cleanName.charAt(0).toUpperCase() + cleanName.slice(1)}`;
+function formatStructuredJiraDescription({
+  title,
+  userStory,
+  scopeDescription,
+  acceptanceCriteria,
+  testCases,
+  definitionOfDone,
+  fallbackBody,
+}) {
+  const sections = [];
+  if (title) {
+    sections.push(`Story Title\n${title.trim()}`);
+  }
+  if (userStory && userStory.trim()) {
+    sections.push(`User Story\n${userStory.trim()}`);
+  }
+  if (scopeDescription && scopeDescription.trim()) {
+    sections.push(`Scope / Description\n${scopeDescription.trim()}`);
+  }
+  if (Array.isArray(acceptanceCriteria) && acceptanceCriteria.length > 0) {
+    const acLines = ['Acceptance Criteria'];
+    acceptanceCriteria.forEach((sc, idx) => {
+      const scTitle =
+        sc.scenarioTitle || `Scenario ${idx + 1}: Verification Flow`;
+      acLines.push(`\n${scTitle}`);
+      (sc.steps || []).forEach((step) => {
+        const cleanStep = String(step).replace(/^[•\-*]\s*/, '').trim();
+        if (cleanStep) acLines.push(`• ${cleanStep}`);
+      });
+    });
+    sections.push(acLines.join('\n'));
+  }
+  if (Array.isArray(testCases) && testCases.length > 0) {
+    const tcLines = ['Test Cases to Automate'];
+    testCases.forEach((tc, idx) => {
+      const cleanTc = String(tc).replace(/^\d+[.)]\s*/, '').trim();
+      if (cleanTc) tcLines.push(`${idx + 1}. ${cleanTc}`);
+    });
+    sections.push(tcLines.join('\n'));
+  }
+  if (Array.isArray(definitionOfDone) && definitionOfDone.length > 0) {
+    const dodLines = ['Definition of Done (DoD)'];
+    definitionOfDone.forEach((d) => {
+      const cleanDod = String(d).replace(/^[•\-*]\s*/, '').trim();
+      if (cleanDod) dodLines.push(`• ${cleanDod}`);
+    });
+    sections.push(dodLines.join('\n'));
+  }
 
-  const bodyLines = lines.slice(1, 25).join('\n');
-  const finalDescription =
-    bodyLines.length > 20
-      ? `### Extracted from Story PDF (${fileName})\n${bodyLines}\n\n### Acceptance Criteria\n- Verify all functional requirements specified in ${fileName}\n- Complete unit and integration test coverage\n- Validate performance and edge cases before QA sign-off`
-      : `### User Story Specification (${fileName})\nAs an enterprise user of ${projectKey}, I want **${finalTitle}** implemented according to the uploaded specification PDF so that workflow reliability, telemetry, and acceptance criteria are satisfied.\n\n### Acceptance Criteria\n1. Implement core story workflow and UI/API validation as defined in \`${fileName}\`\n2. Ensure error handling, audit logging, and permission checks are enforced\n3. Add automated test assertions and verify in QA Testing`;
-
-  const lowerAll = `${fileName} ${rawText}`.toLowerCase();
-  const inferredType = lowerAll.includes('bug')
-    ? 'BUG'
-    : lowerAll.includes('epic')
-    ? 'EPIC'
-    : lowerAll.includes('task')
-    ? 'TASK'
-    : 'STORY';
-
-  const inferredPriority =
-    lowerAll.includes('critical') || lowerAll.includes('highest') || lowerAll.includes('p0')
-      ? 'HIGHEST'
-      : lowerAll.includes('low')
-      ? 'LOW'
-      : 'HIGH';
-
-  const storyPoints = 5;
-  const originalEstimateHours = 12;
-
-  const subtasks = [
-    {
-      title: `Design & implement core logic for: ${finalTitle.slice(0, 60)}`,
-      completed: false,
-    },
-    {
-      title: `Validate acceptance criteria from ${fileName || 'Story PDF'}`,
-      completed: false,
-    },
-    {
-      title: 'Write automated regression tests and complete QA verification',
-      completed: false,
-    },
-  ];
-
-  const singleStory = {
-    title: finalTitle,
-    description: finalDescription,
-    type: inferredType,
-    priority: inferredPriority,
-    storyPoints,
-    originalEstimateHours,
-    dueDate: '2026-10-22',
-    labels: ['pdf-story', 'auto-extracted', projectKey.toLowerCase()],
-    subtasks,
-  };
-
-  return {
-    ...singleStory,
-    stories: [singleStory],
-  };
+  if (sections.length <= 1 && fallbackBody) {
+    return fallbackBody.trim();
+  }
+  return sections.join('\n\n');
 }
 
 app.post('/api/arij/extract-story-pdf', async (req, res) => {
@@ -966,7 +2410,10 @@ app.post('/api/arij/extract-story-pdf', async (req, res) => {
       mimeType = 'application/pdf',
       fileDataBase64 = '',
       extractedTextHint = '',
-      projectKey = 'KAW',
+      leftColumnText = '',
+      rightSidebarText = '',
+      metadataTitle = '',
+      projectKey = 'KP',
     } = req.body || {};
 
     if (!fileDataBase64 && !extractedTextHint) {
@@ -974,15 +2421,36 @@ app.post('/api/arij/extract-story-pdf', async (req, res) => {
       return;
     }
 
+    // 1. Extract real text from either client PDF.js stream or server-side PDF decompression
+    const serverDecodedText = fileDataBase64
+      ? extractReadableTextFromPdfBase64(fileDataBase64)
+      : '';
     const decodedText =
-      extractedTextHint || extractReadableTextFromPdfBase64(fileDataBase64);
+      extractedTextHint && extractedTextHint.trim().length > 10
+        ? extractedTextHint
+        : serverDecodedText;
 
-    if (process.env.GEMINI_API_KEY && fileDataBase64) {
+    // 2. Parse the actual extracted PDF text dynamically (ZERO hardcoded templates!)
+    const dynamicParsed = parseStructuredStoryFromExtractedText({
+      rawText: decodedText,
+      leftText: leftColumnText || decodedText,
+      rightSidebarText,
+      metadataTitle,
+      fileName,
+      defaultProjectKey: projectKey,
+    });
+
+    // 3. Optionally enrich with Gemini multimodal/text extraction grounded strictly in the uploaded document
+    if (process.env.GEMINI_API_KEY && (fileDataBase64 || decodedText)) {
       try {
         const ai = getGeminiClient();
         const parts = [];
 
-        if (mimeType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) {
+        if (
+          fileDataBase64 &&
+          (mimeType === 'application/pdf' ||
+            fileName.toLowerCase().endsWith('.pdf'))
+        ) {
           parts.push({
             inlineData: {
               mimeType: 'application/pdf',
@@ -992,39 +2460,66 @@ app.post('/api/arij/extract-story-pdf', async (req, res) => {
         }
 
         parts.push({
-          text: `You are an expert Arij Agile Product Manager & Story PDF Parser.
-Analyze the uploaded Story / PRD PDF document ("${fileName}") for project "${projectKey}".
-${decodedText ? `Extracted text stream from document:\n${decodedText.slice(0, 6000)}\n` : ''}
+          text: `You are an accurate PDF Document & Agile Story Extractor.
+Extract the exact fields present in this uploaded document (filename: "${fileName}").
+${decodedText ? `Extracted text from the PDF:\n${decodedText.slice(0, 15000)}\n` : ''}
 
-Extract ALL fields needed to populate an Arij Story / Work Item automatically:
-1. title: Clear, actionable Story Summary / Title extracted from the document.
-2. description: Full structured description including User Story ("As a... I want... So that..."), detailed requirements, and bulleted Acceptance Criteria extracted from the PDF.
-3. type: One of "STORY", "TASK", "BUG", "EPIC", "FEATURE", "IMPROVEMENT", "REQUEST". (Default to "STORY").
-4. priority: One of "HIGHEST", "HIGH", "MEDIUM", "LOW", "LOWEST".
-5. storyPoints: Integer story points estimate (e.g. 3, 5, 8, 13).
-6. originalEstimateHours: Numeric engineering hours estimate (e.g. 8, 12, 16, 24).
-7. dueDate: YYYY-MM-DD (if not mentioned, use "2026-10-22").
-8. labels: Array of relevant lowercase hyphenated tags (e.g. ["pdf-import", "user-story", "frontend"]).
-9. subtasks: Array of actionable child subtasks ({ title, completed: false }) broken down from the document's requirements or acceptance criteria.
-10. stories: If the PDF contains multiple stories/tasks, include all of them in the "stories" array (and put the primary/first story in the top-level fields).`,
+CRITICAL RULE: Extract ONLY what is actually written in the document. Do NOT invent hardcoded topics or unrelated test cases.
+Return JSON matching the schema.`,
         });
 
         const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-3-flash-preview',
           contents: { parts },
           config: {
             responseMimeType: 'application/json',
             responseSchema: {
               type: Type.OBJECT,
               properties: {
+                issueKey: { type: Type.STRING },
+                projectName: { type: Type.STRING },
+                projectKey: { type: Type.STRING },
+                parentKey: { type: Type.STRING },
+                parentTitle: { type: Type.STRING },
+                parentStatus: { type: Type.STRING },
                 title: { type: Type.STRING },
-                description: { type: Type.STRING },
                 type: { type: Type.STRING },
+                status: { type: Type.STRING },
                 priority: { type: Type.STRING },
+                assigneeName: { type: Type.STRING },
+                assigneeInitials: { type: Type.STRING },
+                reporterName: { type: Type.STRING },
+                reporterInitials: { type: Type.STRING },
+                componentName: { type: Type.STRING },
+                labels: { type: Type.ARRAY, items: { type: Type.STRING } },
+                reviewers: { type: Type.ARRAY, items: { type: Type.STRING } },
+                approvers: { type: Type.ARRAY, items: { type: Type.STRING } },
+                sprintName: { type: Type.STRING },
                 storyPoints: { type: Type.INTEGER },
                 originalEstimateHours: { type: Type.NUMBER },
                 dueDate: { type: Type.STRING },
-                labels: { type: Type.ARRAY, items: { type: Type.STRING } },
+                createdAtText: { type: Type.STRING },
+                updatedAtText: { type: Type.STRING },
+                sourceUrl: { type: Type.STRING },
+                userStory: { type: Type.STRING },
+                scopeDescription: { type: Type.STRING },
+                acceptanceCriteria: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      scenarioTitle: { type: Type.STRING },
+                      steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    },
+                    required: ['scenarioTitle', 'steps'],
+                  },
+                },
+                testCases: { type: Type.ARRAY, items: { type: Type.STRING } },
+                definitionOfDone: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+                description: { type: Type.STRING },
                 subtasks: {
                   type: Type.ARRAY,
                   items: {
@@ -1036,65 +2531,61 @@ Extract ALL fields needed to populate an Arij Story / Work Item automatically:
                     required: ['title', 'completed'],
                   },
                 },
-                stories: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      title: { type: Type.STRING },
-                      description: { type: Type.STRING },
-                      type: { type: Type.STRING },
-                      priority: { type: Type.STRING },
-                      storyPoints: { type: Type.INTEGER },
-                      originalEstimateHours: { type: Type.NUMBER },
-                      dueDate: { type: Type.STRING },
-                      labels: { type: Type.ARRAY, items: { type: Type.STRING } },
-                      subtasks: {
-                        type: Type.ARRAY,
-                        items: {
-                          type: Type.OBJECT,
-                          properties: {
-                            title: { type: Type.STRING },
-                            completed: { type: Type.BOOLEAN },
-                          },
-                          required: ['title', 'completed'],
-                        },
-                      },
-                    },
-                    required: ['title', 'description', 'type', 'priority'],
-                  },
-                },
               },
-              required: [
-                'title',
-                'description',
-                'type',
-                'priority',
-                'storyPoints',
-                'originalEstimateHours',
-                'labels',
-                'subtasks',
-              ],
+              required: ['title', 'type', 'status', 'priority'],
             },
           },
         });
 
         if (response.text) {
           const parsed = JSON.parse(response.text.trim());
+          parsed.issueKey = parsed.issueKey || dynamicParsed.issueKey;
+          parsed.title = parsed.title || dynamicParsed.title;
+          parsed.userStory =
+            parsed.userStory && parsed.userStory.trim()
+              ? parsed.userStory.trim()
+              : dynamicParsed.userStory;
+          parsed.scopeDescription =
+            parsed.scopeDescription && parsed.scopeDescription.trim()
+              ? parsed.scopeDescription.trim()
+              : dynamicParsed.scopeDescription;
+          parsed.acceptanceCriteria =
+            Array.isArray(parsed.acceptanceCriteria) &&
+            parsed.acceptanceCriteria.length > 0
+              ? parsed.acceptanceCriteria
+              : dynamicParsed.acceptanceCriteria;
+          parsed.testCases =
+            Array.isArray(parsed.testCases) && parsed.testCases.length > 0
+              ? parsed.testCases
+              : dynamicParsed.testCases;
+          parsed.definitionOfDone =
+            Array.isArray(parsed.definitionOfDone) &&
+            parsed.definitionOfDone.length > 0
+              ? parsed.definitionOfDone
+              : dynamicParsed.definitionOfDone;
+
+          const formattedDesc = formatStructuredDescription({
+            title: parsed.title,
+            userStory: parsed.userStory,
+            scopeDescription: parsed.scopeDescription,
+            acceptanceCriteria: parsed.acceptanceCriteria,
+            testCases: parsed.testCases,
+            definitionOfDone: parsed.definitionOfDone,
+            rawFallbackText: decodedText || parsed.description,
+          });
+          parsed.description = formattedDesc || parsed.description || '';
+          parsed.status = normalizeStatusFromText(parsed.status);
+          parsed.priority = normalizePriorityFromText(parsed.priority);
+          parsed.rawExtractedText = decodedText;
+          parsed.subtasks = (parsed.testCases || []).map((tc, idx) => ({
+            key: parsed.issueKey
+              ? `${parsed.issueKey}-${idx + 1}`
+              : undefined,
+            title: tc,
+            completed: false,
+          }));
           if (!Array.isArray(parsed.stories) || parsed.stories.length === 0) {
-            parsed.stories = [
-              {
-                title: parsed.title,
-                description: parsed.description,
-                type: parsed.type || 'STORY',
-                priority: parsed.priority || 'HIGH',
-                storyPoints: parsed.storyPoints || 5,
-                originalEstimateHours: parsed.originalEstimateHours || 12,
-                dueDate: parsed.dueDate || '2026-10-22',
-                labels: parsed.labels || ['pdf-story'],
-                subtasks: parsed.subtasks || [],
-              },
-            ];
+            parsed.stories = [parsed];
           }
           res.json(parsed);
           return;
@@ -1104,20 +2595,15 @@ Extract ALL fields needed to populate an Arij Story / Work Item automatically:
       }
     }
 
-    const fallbackResult = buildFallbackStoryFromText(
-      fileName,
-      decodedText,
-      projectKey
-    );
-    res.json(fallbackResult);
+    res.json(dynamicParsed);
   } catch (error) {
     console.error('Error extracting Story PDF:', error);
-    const fallbackResult = buildFallbackStoryFromText(
-      req.body?.fileName || 'story.pdf',
-      '',
-      req.body?.projectKey || 'KAW'
-    );
-    res.json(fallbackResult);
+    res.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to extract text from PDF',
+    });
   }
 });
 

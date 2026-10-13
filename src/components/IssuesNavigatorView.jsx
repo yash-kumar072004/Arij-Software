@@ -41,13 +41,26 @@ export const IssuesNavigatorView = ({
   const [activeFilterId, setActiveFilterId] = useState('flt-all');
   const [jqlString, setJqlString] = useState('ORDER BY priority DESC');
 
-  // Basic filter states
+  // Basic filter states (Assignee, Status, Priority, Label, Type, Due Date, Component, Sort)
   const [searchText, setSearchText] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [assigneeFilter, setAssigneeFilter] = useState('ALL');
+  const [labelFilter, setLabelFilter] = useState('ALL');
+  const [dueDateFilter, setDueDateFilter] = useState('ALL');
   const [componentFilter, setComponentFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('PRIORITY_DESC');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  const allLabels = useMemo(() => {
+    const set = new Set();
+    issues.forEach((i) => {
+      (i.labels || []).forEach((lbl) => set.add(lbl));
+    });
+    return Array.from(set).sort();
+  }, [issues]);
 
   // Split view selected issue
   const [splitIssueId, setSplitIssueId] = useState(issues[0]?.id || null);
@@ -214,10 +227,63 @@ export const IssuesNavigatorView = ({
       list = list.filter((i) => i.componentId === componentFilter);
     }
 
-    list.sort(
-      (a, b) =>
-        PRIORITY_CONFIG[b.priority].weight - PRIORITY_CONFIG[a.priority].weight
-    );
+    if (labelFilter !== 'ALL') {
+      list = list.filter((i) =>
+        (i.labels || []).some(
+          (l) => l.toLowerCase() === labelFilter.toLowerCase()
+        )
+      );
+    }
+
+    if (dueDateFilter === 'OVERDUE') {
+      list = list.filter((i) => isOverdue(i.dueDate, i.status));
+    } else if (dueDateFilter === 'HAS_DUE_DATE') {
+      list = list.filter((i) => Boolean(i.dueDate));
+    } else if (dueDateFilter === 'NO_DUE_DATE') {
+      list = list.filter((i) => !i.dueDate);
+    } else if (dueDateFilter !== 'ALL') {
+      list = list.filter((i) => String(i.dueDate || '') <= dueDateFilter);
+    }
+
+    list.sort((a, b) => {
+      if (sortBy === 'PRIORITY_ASC') {
+        return (
+          (PRIORITY_CONFIG[a.priority]?.weight || 0) -
+          (PRIORITY_CONFIG[b.priority]?.weight || 0)
+        );
+      }
+      if (sortBy === 'KEY_ASC') {
+        return String(a.key).localeCompare(String(b.key), undefined, {
+          numeric: true,
+        });
+      }
+      if (sortBy === 'KEY_DESC') {
+        return String(b.key).localeCompare(String(a.key), undefined, {
+          numeric: true,
+        });
+      }
+      if (sortBy === 'TITLE_ASC') {
+        return String(a.title).localeCompare(String(b.title));
+      }
+      if (sortBy === 'POINTS_DESC') {
+        return (b.storyPoints || 0) - (a.storyPoints || 0);
+      }
+      if (sortBy === 'DUE_DATE_ASC') {
+        return String(a.dueDate || '9999-12-31').localeCompare(
+          String(b.dueDate || '9999-12-31')
+        );
+      }
+      if (sortBy === 'UPDATED_DESC') {
+        return (
+          new Date(b.updatedAt || 0).getTime() -
+          new Date(a.updatedAt || 0).getTime()
+        );
+      }
+      return (
+        (PRIORITY_CONFIG[b.priority]?.weight || 0) -
+        (PRIORITY_CONFIG[a.priority]?.weight || 0)
+      );
+    });
     return list;
   }, [
     issues,
@@ -229,7 +295,10 @@ export const IssuesNavigatorView = ({
     statusFilter,
     priorityFilter,
     assigneeFilter,
+    labelFilter,
+    dueDateFilter,
     componentFilter,
+    sortBy,
   ]);
 
   const handleExportCsv = () => {
@@ -268,7 +337,28 @@ export const IssuesNavigatorView = ({
   const handleSaveCurrentFilter = (e) => {
     e.preventDefault();
     if (!newFilterName.trim()) return;
-    onSaveFilter(newFilterName.trim(), jqlString);
+    const synthesizedQuery =
+      queryMode === 'JQL'
+        ? jqlString
+        : [
+            `project = ${project.key}`,
+            statusFilter !== 'ALL' ? `status = "${statusFilter}"` : null,
+            priorityFilter !== 'ALL' ? `priority = "${priorityFilter}"` : null,
+            typeFilter !== 'ALL' ? `type = "${typeFilter}"` : null,
+            assigneeFilter === 'ME' ? 'assignee = currentUser()' : null,
+          ]
+            .filter(Boolean)
+            .join(' AND ');
+    onSaveFilter(newFilterName.trim(), synthesizedQuery);
+    fetch('/api/saved-filters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newFilterName.trim(),
+        projectId: project.id,
+        query: synthesizedQuery,
+      }),
+    }).catch(() => {});
     setNewFilterName('');
     setSavingFilter(false);
   };
@@ -281,6 +371,13 @@ export const IssuesNavigatorView = ({
       null
     );
   }, [filteredIssues, splitIssueId]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredIssues.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedIssues = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredIssues.slice(start, start + pageSize);
+  }, [filteredIssues, safePage, pageSize]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
@@ -512,6 +609,32 @@ export const IssuesNavigatorView = ({
               </select>
 
               <select
+                value={labelFilter}
+                onChange={(e) => setLabelFilter(e.target.value)}
+                aria-label="Filter by Label"
+                className="px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-300 rounded-md text-slate-700"
+              >
+                <option value="ALL">Label: All</option>
+                {allLabels.map((lbl) => (
+                  <option key={lbl} value={lbl}>
+                    {lbl}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={dueDateFilter}
+                onChange={(e) => setDueDateFilter(e.target.value)}
+                aria-label="Filter by Due Date"
+                className="px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-300 rounded-md text-slate-700"
+              >
+                <option value="ALL">Due Date: All</option>
+                <option value="OVERDUE">Overdue Only</option>
+                <option value="HAS_DUE_DATE">Has Due Date</option>
+                <option value="NO_DUE_DATE">No Due Date</option>
+              </select>
+
+              <select
                 value={componentFilter}
                 onChange={(e) => setComponentFilter(e.target.value)}
                 aria-label="Filter by Component"
@@ -523,6 +646,22 @@ export const IssuesNavigatorView = ({
                     {c.name}
                   </option>
                 ))}
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                aria-label="Sort issues by"
+                className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 border border-slate-300 rounded-md text-slate-800"
+              >
+                <option value="PRIORITY_DESC">Sort: Priority (High → Low)</option>
+                <option value="PRIORITY_ASC">Sort: Priority (Low → High)</option>
+                <option value="KEY_ASC">Sort: Key (A → Z)</option>
+                <option value="KEY_DESC">Sort: Key (Z → A)</option>
+                <option value="TITLE_ASC">Sort: Summary (A → Z)</option>
+                <option value="POINTS_DESC">Sort: Story Points (High → Low)</option>
+                <option value="DUE_DATE_ASC">Sort: Due Date (Soonest)</option>
+                <option value="UPDATED_DESC">Sort: Recently Updated</option>
               </select>
             </div>
 
@@ -539,26 +678,59 @@ export const IssuesNavigatorView = ({
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
+                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 select-none">
                   <th className="py-2.5 px-4 w-24">Type</th>
-                  <th className="py-2.5 px-4 w-28">Key</th>
-                  <th className="py-2.5 px-4">Summary</th>
+                  <th
+                    onClick={() =>
+                      setSortBy((s) =>
+                        s === 'KEY_ASC' ? 'KEY_DESC' : 'KEY_ASC'
+                      )
+                    }
+                    className="py-2.5 px-4 w-28 cursor-pointer hover:text-blue-600"
+                  >
+                    Key ↕
+                  </th>
+                  <th
+                    onClick={() => setSortBy('TITLE_ASC')}
+                    className="py-2.5 px-4 cursor-pointer hover:text-blue-600"
+                  >
+                    Summary ↕
+                  </th>
                   <th className="py-2.5 px-4 w-40">Assignee</th>
-                  <th className="py-2.5 px-4 w-28">Priority</th>
+                  <th
+                    onClick={() =>
+                      setSortBy((s) =>
+                        s === 'PRIORITY_DESC' ? 'PRIORITY_ASC' : 'PRIORITY_DESC'
+                      )
+                    }
+                    className="py-2.5 px-4 w-28 cursor-pointer hover:text-blue-600"
+                  >
+                    Priority ↕
+                  </th>
                   <th className="py-2.5 px-4 w-36">Status</th>
-                  <th className="py-2.5 px-4 w-24 text-right">Points</th>
-                  <th className="py-2.5 px-4 w-28 text-right">Due Date</th>
+                  <th
+                    onClick={() => setSortBy('POINTS_DESC')}
+                    className="py-2.5 px-4 w-24 text-right cursor-pointer hover:text-blue-600"
+                  >
+                    Points ↕
+                  </th>
+                  <th
+                    onClick={() => setSortBy('DUE_DATE_ASC')}
+                    className="py-2.5 px-4 w-28 text-right cursor-pointer hover:text-blue-600"
+                  >
+                    Due Date ↕
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-xs">
-                {filteredIssues.length === 0 ? (
+                {paginatedIssues.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-slate-400">
                       No issues match the current filter criteria.
                     </td>
                   </tr>
                 ) : (
-                  filteredIssues.map((iss) => {
+                  paginatedIssues.map((iss) => {
                     const assignee = iss.assigneeId ? userMap[iss.assigneeId] : null;
                     const overdue = isOverdue(iss.dueDate, iss.status);
                     return (
@@ -634,6 +806,47 @@ export const IssuesNavigatorView = ({
                 )}
               </tbody>
             </table>
+
+            {/* Interactive Pagination Footer */}
+            <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+              <div className="flex items-center gap-2">
+                <span className="font-mono">
+                  Page {safePage} of {totalPages} ({filteredIssues.length} total matching issues)
+                </span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  aria-label="Rows per page"
+                  className="px-2 py-1 bg-white border border-slate-300 rounded font-mono text-xs text-slate-700"
+                >
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-2.5 py-1 bg-white border border-slate-300 rounded font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-2.5 py-1 bg-white border border-slate-300 rounded font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           /* Detail Split View */

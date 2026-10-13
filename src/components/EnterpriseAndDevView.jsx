@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Building2,
   CheckCircle2,
@@ -26,6 +26,28 @@ export const EnterpriseAndDevView = ({
   currentUser,
   onAddUser,
 }) => {
+  const [openapiSpec, setOpenapiSpec] = useState(null);
+  const [apiTestOutput, setApiTestOutput] = useState('');
+  const [apiTestUrl, setApiTestUrl] = useState('/api/issues?page=1&limit=3');
+
+  useEffect(() => {
+    fetch('/api/docs/openapi.json')
+      .then((r) => r.json())
+      .then((spec) => setOpenapiSpec(spec))
+      .catch(() => {});
+  }, []);
+
+  const handleRunLiveApiTest = async (urlToFetch) => {
+    const targetUrl = urlToFetch || apiTestUrl;
+    setApiTestUrl(targetUrl);
+    try {
+      const res = await fetch(targetUrl);
+      const data = await res.json();
+      setApiTestOutput(JSON.stringify(data, null, 2).slice(0, 2600));
+    } catch (err) {
+      setApiTestOutput(JSON.stringify({ error: String(err) }, null, 2));
+    }
+  };
   // 'DEV_CICD' | 'ORG_RBAC' | 'CUSTOM_FIELDS_TIME' | 'API_PLUGINS_AUDIT'
   const [subTab, setSubTab] = useState('DEV_CICD');
 
@@ -559,27 +581,21 @@ export const EnterpriseAndDevView = ({
             <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  Arij REST API Endpoints &amp; Full JSON Workspace Export
+                  Arij OpenAPI 3.1 / Swagger REST API Specification &amp; Live Tester
                 </h3>
-                <div className="flex flex-wrap gap-2 mt-2 font-mono text-[11px]">
-                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-800">
-                    GET /api/projects
-                  </span>
-                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-800">
-                    GET /api/issues
-                  </span>
-                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-800">
-                    POST /api/issues
-                  </span>
-                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-800">
-                    GET /api/users
-                  </span>
-                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-800">
-                    GET /api/sprints
-                  </span>
-                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Zod-validated REST API with JWT Bearer authentication, RBAC role guards, and cursor/offset pagination
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRunLiveApiTest('/api/docs/openapi.json')}
+                  className="px-3.5 py-2 text-xs font-semibold bg-emerald-600 text-white rounded-md hover:bg-emerald-700 flex items-center gap-1.5"
+                >
+                  <Code2 className="w-3.5 h-3.5" />
+                  Inspect OpenAPI 3.1 Spec
+                </button>
                 <button
                   type="button"
                   onClick={handleExportWorkspaceCsv}
@@ -596,6 +612,116 @@ export const EnterpriseAndDevView = ({
                   <Download className="w-3.5 h-3.5" />
                   Export Project JSON Backup
                 </button>
+              </div>
+            </div>
+
+            {/* Interactive OpenAPI 3.1 Endpoint Reference + Live Runner */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Documented OpenAPI 3.1 Paths ({openapiSpec?.info?.version || '1.0.0'})
+                  </span>
+                  <span className="font-mono text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    /api/docs/openapi.json
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-200 border border-slate-200 rounded-lg max-h-80 overflow-y-auto text-xs">
+                  {openapiSpec?.paths
+                    ? Object.entries(openapiSpec.paths).flatMap(
+                        ([pathKey, methodsObj]) =>
+                          Object.entries(methodsObj).map(([method, meta]) => {
+                            const upperMethod = method.toUpperCase();
+                            const badgeColor =
+                              upperMethod === 'GET'
+                                ? 'bg-blue-100 text-blue-800'
+                                : upperMethod === 'POST'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : upperMethod === 'PATCH'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-800';
+                            return (
+                              <div
+                                key={`${method}-${pathKey}`}
+                                className="px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span
+                                    className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold w-14 text-center shrink-0 ${badgeColor}`}
+                                  >
+                                    {upperMethod}
+                                  </span>
+                                  <span className="font-mono font-semibold text-slate-900 truncate">
+                                    {pathKey}
+                                  </span>
+                                  <span className="text-slate-500 truncate hidden sm:inline">
+                                    — {meta.summary}
+                                  </span>
+                                </div>
+                                {upperMethod === 'GET' && !pathKey.includes('{') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRunLiveApiTest(pathKey)}
+                                    className="px-2 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 rounded shrink-0"
+                                  >
+                                    Try It
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })
+                      )
+                    : null}
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 bg-slate-900 text-slate-100 rounded-xl p-5 flex flex-col justify-between space-y-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono font-bold text-emerald-400">
+                      LIVE REST API CONSOLE
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleRunLiveApiTest('/api/issues?page=1&limit=2')
+                        }
+                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 font-mono text-[10px]"
+                      >
+                        Paginated Issues
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleRunLiveApiTest('/api/reports/summary')
+                        }
+                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 font-mono text-[10px]"
+                      >
+                        Reports
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={apiTestUrl}
+                      onChange={(e) => setApiTestUrl(e.target.value)}
+                      className="flex-1 px-2.5 py-1.5 rounded bg-slate-800 border border-slate-700 font-mono text-xs text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRunLiveApiTest(apiTestUrl)}
+                      className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white"
+                    >
+                      Send GET
+                    </button>
+                  </div>
+                </div>
+                <pre className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-[11px] text-emerald-300 overflow-auto max-h-60">
+                  {apiTestOutput ||
+                    '// Click "Try It" or "Send GET" to inspect live JSON response...'}
+                </pre>
               </div>
             </div>
 

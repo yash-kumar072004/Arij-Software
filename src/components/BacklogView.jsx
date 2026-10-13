@@ -41,6 +41,9 @@ export const BacklogView = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEpicId, setSelectedEpicId] = useState(null);
+  const [assigneeFilter, setAssigneeFilter] = useState('ALL');
+  const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('PRIORITY');
   const [showEpicPanel, setShowEpicPanel] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState({});
 
@@ -76,20 +79,63 @@ export const BacklogView = ({
   }, [issues]);
 
   const filteredIssues = useMemo(() => {
-    return nonEpicIssues.filter((i) => {
+    const list = nonEpicIssues.filter((i) => {
       if (selectedEpicId && i.epicId !== selectedEpicId) return false;
+      if (assigneeFilter === 'UNASSIGNED') {
+        if (i.assigneeId) return false;
+      } else if (assigneeFilter !== 'ALL' && i.assigneeId !== assigneeFilter) {
+        return false;
+      }
+      if (priorityFilter !== 'ALL' && i.priority !== priorityFilter) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         if (
           !i.key.toLowerCase().includes(q) &&
-          !i.title.toLowerCase().includes(q)
+          !i.title.toLowerCase().includes(q) &&
+          !(i.labels || []).some((l) => l.toLowerCase().includes(q))
         ) {
           return false;
         }
       }
       return true;
     });
-  }, [nonEpicIssues, selectedEpicId, searchQuery]);
+
+    list.sort((a, b) => {
+      if (sortBy === 'KEY') {
+        return String(a.key).localeCompare(String(b.key), undefined, {
+          numeric: true,
+        });
+      }
+      if (sortBy === 'POINTS') {
+        return (b.storyPoints || 0) - (a.storyPoints || 0);
+      }
+      if (sortBy === 'DUE_DATE') {
+        return String(a.dueDate || '9999-12-31').localeCompare(
+          String(b.dueDate || '9999-12-31')
+        );
+      }
+      if (sortBy === 'UPDATED') {
+        return (
+          new Date(b.updatedAt || 0).getTime() -
+          new Date(a.updatedAt || 0).getTime()
+        );
+      }
+      return (
+        (PRIORITY_CONFIG[b.priority]?.weight || 0) -
+        (PRIORITY_CONFIG[a.priority]?.weight || 0)
+      );
+    });
+    return list;
+  }, [
+    nonEpicIssues,
+    selectedEpicId,
+    assigneeFilter,
+    priorityFilter,
+    searchQuery,
+    sortBy,
+  ]);
 
   const activeAndPlannedSprints = useMemo(() => {
     return sprints.filter((s) => s.status !== SprintStatus.COMPLETED);
@@ -260,7 +306,7 @@ export const BacklogView = ({
           </h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -268,9 +314,37 @@ export const BacklogView = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search backlog issues..."
-              className="pl-8 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:border-blue-600 w-56"
+              className="pl-8 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:border-blue-600 w-48"
             />
           </div>
+
+          <select
+            value={assigneeFilter}
+            onChange={(e) => setAssigneeFilter(e.target.value)}
+            aria-label="Filter backlog by assignee"
+            className="px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-md text-slate-700"
+          >
+            <option value="ALL">Assignee: All</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+            <option value="UNASSIGNED">Unassigned</option>
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            aria-label="Sort backlog by"
+            className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 border border-slate-200 rounded-md text-slate-800"
+          >
+            <option value="PRIORITY">Sort: Priority</option>
+            <option value="KEY">Sort: Issue Key</option>
+            <option value="POINTS">Sort: Story Points</option>
+            <option value="DUE_DATE">Sort: Due Date</option>
+            <option value="UPDATED">Sort: Recently Updated</option>
+          </select>
 
           <button
             type="button"

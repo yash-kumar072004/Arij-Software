@@ -37,6 +37,7 @@ export const SprintStatus = {
 
 export const NavigationTab = {
   MY_SPACE: 'MY_SPACE',
+  VULNERABILITIES: 'VULNERABILITIES',
   DASHBOARDS: 'DASHBOARDS',
   BOARD: 'BOARD',
   BACKLOG: 'BACKLOG',

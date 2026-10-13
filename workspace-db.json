@@ -1,0 +1,3124 @@
+{
+  "revision": 28,
+  "updatedAt": "2026-10-13T05:03:06.815Z",
+  "workspace": {
+    "currentUserId": "usr-1",
+    "activeProjectId": "prj-1",
+    "users": [
+      {
+        "id": "usr-1",
+        "name": "Arjun Mehta",
+        "email": "arjun.mehta@kawach.ai",
+        "role": "Principal Architect & Lead",
+        "department": "Core Platform",
+        "avatarUrl": "",
+        "initials": "AM"
+      },
+      {
+        "id": "usr-2",
+        "name": "Priya Sharma",
+        "email": "priya.sharma@kawach.ai",
+        "role": "Senior Frontend Engineer",
+        "department": "Product Experience",
+        "avatarUrl": "",
+        "initials": "PS"
+      },
+      {
+        "id": "usr-3",
+        "name": "Rohan Verma",
+        "email": "rohan.verma@kawach.ai",
+        "role": "Staff Backend Engineer",
+        "department": "Distributed Systems",
+        "avatarUrl": "",
+        "initials": "RV"
+      },
+      {
+        "id": "usr-4",
+        "name": "Ananya Nair",
+        "email": "ananya.nair@kawach.ai",
+        "role": "Lead QA & Release Engineer",
+        "department": "Quality Engineering",
+        "avatarUrl": "",
+        "initials": "AN"
+      },
+      {
+        "id": "usr-5",
+        "name": "Vikram Desai",
+        "email": "vikram.desai@kawach.ai",
+        "role": "Product Manager",
+        "department": "Product Strategy",
+        "avatarUrl": "",
+        "initials": "VD"
+      },
+      {
+        "id": "usr-6",
+        "name": "Suman Manna",
+        "email": "suman.manna@kawach.ai",
+        "role": "QA Automation Engineer",
+        "department": "Quality Engineering",
+        "avatarUrl": "",
+        "initials": "SM"
+      },
+      {
+        "id": "usr-7",
+        "name": "Yash Kumar",
+        "email": "yash.kumar@kawach.ai",
+        "role": "Principal Architect & Lead",
+        "department": "Core Platform",
+        "avatarUrl": "",
+        "initials": "YK"
+      }
+    ],
+    "personalTodosByUser": {
+      "usr-1": [
+        {
+          "id": "todo-1",
+          "text": "Sign off on Zero-Trust mTLS RFC before Friday",
+          "done": false
+        },
+        {
+          "id": "todo-2",
+          "text": "Review Priya’s Kanban drag-and-drop PR",
+          "done": true
+        }
+      ],
+      "usr-2": [
+        {
+          "id": "todo-3",
+          "text": "Audit keyboard accessibility on Backlog split view",
+          "done": false
+        },
+        {
+          "id": "todo-4",
+          "text": "Update design tokens for status badges",
+          "done": true
+        }
+      ],
+      "usr-3": [
+        {
+          "id": "todo-5",
+          "text": "Benchmark Redis stream consumer throughput",
+          "done": false
+        }
+      ],
+      "usr-4": [
+        {
+          "id": "todo-6",
+          "text": "Run regression suite on v2.4.0 release candidate",
+          "done": false
+        }
+      ],
+      "usr-5": [
+        {
+          "id": "todo-7",
+          "text": "Prepare Q4 stakeholder roadmap presentation",
+          "done": false
+        }
+      ]
+    },
+    "projects": [
+      {
+        "id": "prj-1",
+        "key": "KP",
+        "name": "Kawach Product",
+        "description": "Kawach Product & Cloud Security Platform — Vulnerabilities List (/vulnerabilities), Search, Filter, Show Page, Zero-Trust Telemetry, and QA Automation.",
+        "category": "Software Engineering",
+        "template": "Scrum",
+        "leadId": "usr-1",
+        "defaultAssigneeId": "usr-6",
+        "ownerUserId": null,
+        "isPersonal": false,
+        "issueCounter": 6459,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 4,
+          "IN_REVIEW": 3,
+          "QA": 3,
+          "DONE": 0
+        },
+        "createdAt": "2026-08-01T09:00:00.000Z"
+      },
+      {
+        "id": "prj-2",
+        "key": "MOB",
+        "name": "Kawach Mobile Authenticator",
+        "description": "Biometric push authentication, hardware key enrollments, and offline TOTP vault for iOS and Android.",
+        "category": "Product Management",
+        "template": "Kanban",
+        "leadId": "usr-5",
+        "defaultAssigneeId": "usr-2",
+        "ownerUserId": null,
+        "isPersonal": false,
+        "issueCounter": 209,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 3,
+          "IN_REVIEW": 2,
+          "QA": 2,
+          "DONE": 0
+        },
+        "createdAt": "2026-08-15T10:30:00.000Z"
+      },
+      {
+        "id": "prj-personal-usr-1",
+        "key": "AMP",
+        "name": "Arjun Mehta's Personal Workspace",
+        "description": "Dedicated personal workspace, sprint board, and task tracker owned exclusively by Arjun Mehta (Principal Architect & Lead).",
+        "category": "Software Engineering",
+        "template": "Scrum",
+        "leadId": "usr-1",
+        "defaultAssigneeId": "usr-1",
+        "ownerUserId": "usr-1",
+        "isPersonal": true,
+        "issueCounter": 103,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 4,
+          "IN_REVIEW": 3,
+          "QA": 3,
+          "DONE": 0
+        },
+        "createdAt": "2026-10-06T09:00:00.000Z"
+      },
+      {
+        "id": "prj-personal-usr-2",
+        "key": "PSP",
+        "name": "Priya Sharma's Personal Workspace",
+        "description": "Dedicated personal workspace, sprint board, and task tracker owned exclusively by Priya Sharma (Senior Frontend Engineer).",
+        "category": "Software Engineering",
+        "template": "Scrum",
+        "leadId": "usr-2",
+        "defaultAssigneeId": "usr-2",
+        "ownerUserId": "usr-2",
+        "isPersonal": true,
+        "issueCounter": 103,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 4,
+          "IN_REVIEW": 3,
+          "QA": 3,
+          "DONE": 0
+        },
+        "createdAt": "2026-10-06T09:00:00.000Z"
+      },
+      {
+        "id": "prj-personal-usr-3",
+        "key": "RVP",
+        "name": "Rohan Verma's Personal Workspace",
+        "description": "Dedicated personal workspace, sprint board, and task tracker owned exclusively by Rohan Verma (Staff Backend Engineer).",
+        "category": "Software Engineering",
+        "template": "Scrum",
+        "leadId": "usr-3",
+        "defaultAssigneeId": "usr-3",
+        "ownerUserId": "usr-3",
+        "isPersonal": true,
+        "issueCounter": 103,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 4,
+          "IN_REVIEW": 3,
+          "QA": 3,
+          "DONE": 0
+        },
+        "createdAt": "2026-10-06T09:00:00.000Z"
+      },
+      {
+        "id": "prj-personal-usr-4",
+        "key": "ANP",
+        "name": "Ananya Nair's Personal Workspace",
+        "description": "Dedicated personal workspace, sprint board, and task tracker owned exclusively by Ananya Nair (Lead QA & Release Engineer).",
+        "category": "Software Engineering",
+        "template": "Scrum",
+        "leadId": "usr-4",
+        "defaultAssigneeId": "usr-4",
+        "ownerUserId": "usr-4",
+        "isPersonal": true,
+        "issueCounter": 103,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 4,
+          "IN_REVIEW": 3,
+          "QA": 3,
+          "DONE": 0
+        },
+        "createdAt": "2026-10-06T09:00:00.000Z"
+      },
+      {
+        "id": "prj-personal-usr-5",
+        "key": "VDP",
+        "name": "Vikram Desai's Personal Workspace",
+        "description": "Dedicated personal workspace, sprint board, and task tracker owned exclusively by Vikram Desai (Product Manager).",
+        "category": "Software Engineering",
+        "template": "Scrum",
+        "leadId": "usr-5",
+        "defaultAssigneeId": "usr-5",
+        "ownerUserId": "usr-5",
+        "isPersonal": true,
+        "issueCounter": 103,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 4,
+          "IN_REVIEW": 3,
+          "QA": 3,
+          "DONE": 0
+        },
+        "createdAt": "2026-10-06T09:00:00.000Z"
+      },
+      {
+        "id": "prj-personal-usr-6",
+        "key": "SMP",
+        "name": "Suman Manna's Personal Workspace",
+        "description": "Dedicated personal workspace, sprint board, and task tracker owned exclusively by Suman Manna (QA Automation Engineer).",
+        "category": "Software Engineering",
+        "template": "Scrum",
+        "leadId": "usr-6",
+        "defaultAssigneeId": "usr-6",
+        "ownerUserId": "usr-6",
+        "isPersonal": true,
+        "issueCounter": 103,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 4,
+          "IN_REVIEW": 3,
+          "QA": 3,
+          "DONE": 0
+        },
+        "createdAt": "2026-10-06T09:00:00.000Z"
+      },
+      {
+        "id": "prj-personal-usr-7",
+        "key": "YKP",
+        "name": "Yash Kumar's Personal Workspace",
+        "description": "Dedicated personal workspace, sprint board, and task tracker owned exclusively by Yash Kumar (Principal Architect & Lead).",
+        "category": "Software Engineering",
+        "template": "Scrum",
+        "leadId": "usr-7",
+        "defaultAssigneeId": "usr-7",
+        "ownerUserId": "usr-7",
+        "isPersonal": true,
+        "issueCounter": 103,
+        "wipLimits": {
+          "TODO": 0,
+          "IN_PROGRESS": 4,
+          "IN_REVIEW": 3,
+          "QA": 3,
+          "DONE": 0
+        },
+        "createdAt": "2026-10-06T09:00:00.000Z"
+      }
+    ],
+    "sprints": [
+      {
+        "id": "spr-20",
+        "projectId": "prj-1",
+        "name": "KAW Sprint 20 — Core Identity Engine",
+        "goal": "Ship OIDC token federation and role-based access policy evaluator.",
+        "status": "COMPLETED",
+        "startDate": "2026-09-07",
+        "endDate": "2026-09-20",
+        "completedAt": "2026-09-20T17:00:00.000Z",
+        "committedPoints": 26,
+        "completedPoints": 26
+      },
+      {
+        "id": "spr-21",
+        "projectId": "prj-1",
+        "name": "KAW Sprint 21 — Zero-Trust Policy & Audit Graph",
+        "goal": "Complete real-time anomaly streaming, RBAC permission matrix, and low-latency board filtering.",
+        "status": "PLANNED",
+        "startDate": "2026-09-28",
+        "endDate": "2026-10-12"
+      },
+      {
+        "id": "spr-22",
+        "projectId": "prj-1",
+        "name": "KAW Sprint 22 — Automated Remediation Playbooks",
+        "goal": "Enable one-click quarantine webhooks and SOC2 compliance export bundles.",
+        "status": "PLANNED",
+        "startDate": "2026-10-13",
+        "endDate": "2026-10-27"
+      },
+      {
+        "id": "spr-mob-1",
+        "projectId": "prj-2",
+        "name": "MOB Continuous Flow Sprint",
+        "goal": "Deliver passkey biometric binding and push notification cryptographic verification.",
+        "status": "ACTIVE",
+        "startDate": "2026-09-29",
+        "endDate": "2026-10-15"
+      },
+      {
+        "id": "spr-personal-usr-1",
+        "projectId": "prj-personal-usr-1",
+        "name": "AMP Personal Sprint 1",
+        "goal": "Complete Arjun Mehta's personal engineering milestones, code reviews, and sprint deliverables.",
+        "status": "ACTIVE",
+        "startDate": "2026-10-05",
+        "endDate": "2026-10-19"
+      },
+      {
+        "id": "spr-personal-usr-2",
+        "projectId": "prj-personal-usr-2",
+        "name": "PSP Personal Sprint 1",
+        "goal": "Complete Priya Sharma's personal engineering milestones, code reviews, and sprint deliverables.",
+        "status": "ACTIVE",
+        "startDate": "2026-10-05",
+        "endDate": "2026-10-19"
+      },
+      {
+        "id": "spr-personal-usr-3",
+        "projectId": "prj-personal-usr-3",
+        "name": "RVP Personal Sprint 1",
+        "goal": "Complete Rohan Verma's personal engineering milestones, code reviews, and sprint deliverables.",
+        "status": "ACTIVE",
+        "startDate": "2026-10-05",
+        "endDate": "2026-10-19"
+      },
+      {
+        "id": "spr-personal-usr-4",
+        "projectId": "prj-personal-usr-4",
+        "name": "ANP Personal Sprint 1",
+        "goal": "Complete Ananya Nair's personal engineering milestones, code reviews, and sprint deliverables.",
+        "status": "ACTIVE",
+        "startDate": "2026-10-05",
+        "endDate": "2026-10-19"
+      },
+      {
+        "id": "spr-personal-usr-5",
+        "projectId": "prj-personal-usr-5",
+        "name": "VDP Personal Sprint 1",
+        "goal": "Complete Vikram Desai's personal engineering milestones, code reviews, and sprint deliverables.",
+        "status": "ACTIVE",
+        "startDate": "2026-10-05",
+        "endDate": "2026-10-19"
+      },
+      {
+        "id": "spr-personal-usr-6",
+        "projectId": "prj-personal-usr-6",
+        "name": "SMP Personal Sprint 1",
+        "goal": "Complete Suman Manna's personal engineering milestones, code reviews, and sprint deliverables.",
+        "status": "ACTIVE",
+        "startDate": "2026-10-05",
+        "endDate": "2026-10-19"
+      },
+      {
+        "id": "spr-personal-usr-7",
+        "projectId": "prj-personal-usr-7",
+        "name": "YKP Personal Sprint 1",
+        "goal": "Complete Yash Kumar's personal engineering milestones, code reviews, and sprint deliverables.",
+        "status": "ACTIVE",
+        "startDate": "2026-10-05",
+        "endDate": "2026-10-19"
+      },
+      {
+        "id": "spr-1791867628496",
+        "projectId": "prj-1",
+        "name": "Sprint 45 — E2E Verification",
+        "goal": "Updated active sprint goal",
+        "status": "COMPLETED",
+        "startDate": "2026-10-13",
+        "endDate": "2026-10-30",
+        "completedAt": "2026-10-13T05:00:28.515Z",
+        "committedPoints": 0,
+        "completedPoints": 0
+      },
+      {
+        "id": "spr-1791867743476",
+        "projectId": "prj-1",
+        "name": "Sprint 45 — E2E Verification",
+        "goal": "Updated active sprint goal",
+        "status": "COMPLETED",
+        "startDate": "2026-10-13",
+        "endDate": "2026-10-30",
+        "completedAt": "2026-10-13T05:02:23.503Z",
+        "committedPoints": 0,
+        "completedPoints": 0
+      },
+      {
+        "id": "spr-1791867765642",
+        "projectId": "prj-1",
+        "name": "Sprint 45 — E2E Verification",
+        "goal": "Updated active sprint goal",
+        "status": "COMPLETED",
+        "startDate": "2026-10-13",
+        "endDate": "2026-10-30",
+        "completedAt": "2026-10-13T05:02:45.658Z",
+        "committedPoints": 0,
+        "completedPoints": 0
+      },
+      {
+        "id": "spr-1791867786802",
+        "projectId": "prj-1",
+        "name": "Sprint 45 — E2E Verification",
+        "goal": "Updated active sprint goal",
+        "status": "COMPLETED",
+        "startDate": "2026-10-13",
+        "endDate": "2026-10-30",
+        "completedAt": "2026-10-13T05:03:06.815Z",
+        "committedPoints": 0,
+        "completedPoints": 0
+      }
+    ],
+    "releases": [
+      {
+        "id": "rel-1",
+        "projectId": "prj-1",
+        "name": "v2.3.0 — Identity Federation",
+        "description": "Production release of SAML 2.0 & OIDC enterprise connectors.",
+        "releaseDate": "2026-09-21",
+        "status": "RELEASED",
+        "createdAt": "2026-09-01T08:00:00.000Z"
+      },
+      {
+        "id": "rel-2",
+        "projectId": "prj-1",
+        "name": "v2.4.0 — Real-Time Threat Graph",
+        "description": "Streaming telemetry pipeline, WIP limit alerts, and executive burndown analytics.",
+        "releaseDate": "2026-10-14",
+        "status": "UNRELEASED",
+        "createdAt": "2026-09-22T08:00:00.000Z"
+      },
+      {
+        "id": "rel-3",
+        "projectId": "prj-1",
+        "name": "v2.5.0 — Compliance Automation",
+        "description": "Automated ISO27001 / SOC2 evidence collector and webhook responder.",
+        "releaseDate": "2026-10-30",
+        "status": "UNRELEASED",
+        "createdAt": "2026-09-28T08:00:00.000Z"
+      }
+    ],
+    "components": [
+      {
+        "id": "cmp-frontend-spa",
+        "projectId": "prj-1",
+        "name": "Frontend SPA",
+        "description": "Single-Page Application UI for Vulnerabilities List, Search, Filter, and Show (Details) views.",
+        "leadId": "usr-6"
+      },
+      {
+        "id": "cmp-1",
+        "projectId": "prj-1",
+        "name": "Auth & RBAC Engine",
+        "description": "Token verification, session policies, and granular role checks.",
+        "leadId": "usr-1"
+      },
+      {
+        "id": "cmp-2",
+        "projectId": "prj-1",
+        "name": "Telemetry Streamer",
+        "description": "High-throughput Kafka/WebSocket ingestion and anomaly scoring.",
+        "leadId": "usr-3"
+      },
+      {
+        "id": "cmp-3",
+        "projectId": "prj-1",
+        "name": "Security Console UI",
+        "description": "React interactive dashboards, Kanban workflows, and AQL search bar.",
+        "leadId": "usr-2"
+      },
+      {
+        "id": "cmp-4",
+        "projectId": "prj-1",
+        "name": "Compliance & Reporting",
+        "description": "Audit logs, PDF/CSV exports, and velocity telemetry.",
+        "leadId": "usr-4"
+      }
+    ],
+    "savedFilters": [
+      {
+        "id": "flt-all",
+        "name": "All Project Issues",
+        "jql": "ORDER BY priority DESC",
+        "isSystem": true
+      },
+      {
+        "id": "flt-my-open",
+        "name": "My Open Issues",
+        "jql": "assignee = currentUser() AND status != DONE ORDER BY priority DESC",
+        "isSystem": true
+      },
+      {
+        "id": "flt-bugs",
+        "name": "Active Bugs & Defects",
+        "jql": "type = BUG AND status != DONE ORDER BY priority DESC",
+        "isSystem": true
+      },
+      {
+        "id": "flt-high",
+        "name": "Critical & High Priority",
+        "jql": "priority IN (HIGHEST, HIGH) AND status != DONE",
+        "isSystem": true
+      },
+      {
+        "id": "flt-done",
+        "name": "Recently Resolved",
+        "jql": "status = DONE ORDER BY updated DESC",
+        "isSystem": true
+      }
+    ],
+    "issues": [
+      {
+        "id": "iss-1791867786519-ameh",
+        "projectId": "prj-1",
+        "key": "KP-6459",
+        "title": "Kanban Drag Transition Test Issue",
+        "description": "",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-13",
+        "dueDate": "",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-1791867786728-cnkf",
+            "authorId": "usr-1",
+            "body": "Hey @Arjun please review the updated SQL migration schema.",
+            "mentions": [
+              "Arjun"
+            ],
+            "createdAt": "2026-10-13T05:03:06.728Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [
+          {
+            "id": "hst-1791867786606-q4ca",
+            "actorId": "usr-1",
+            "field": "type",
+            "oldValue": "TASK",
+            "newValue": "STORY",
+            "timestamp": "2026-10-13T05:03:06.606Z"
+          },
+          {
+            "id": "hst-1791867786606-2tgm",
+            "actorId": "usr-1",
+            "field": "storyPoints",
+            "oldValue": "5",
+            "newValue": "0",
+            "timestamp": "2026-10-13T05:03:06.606Z"
+          },
+          {
+            "id": "hst-1791867786606-7klq",
+            "actorId": "usr-1",
+            "field": "priority",
+            "oldValue": "HIGH",
+            "newValue": "MEDIUM",
+            "timestamp": "2026-10-13T05:03:06.606Z"
+          },
+          {
+            "id": "hst-1791867786606-fsbn",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "TODO",
+            "newValue": "IN_PROGRESS",
+            "timestamp": "2026-10-13T05:03:06.606Z"
+          },
+          {
+            "id": "hst-1791867786519",
+            "actorId": "usr-1",
+            "field": "created",
+            "oldValue": "None",
+            "newValue": "TODO",
+            "timestamp": "2026-10-13T05:03:06.519Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-13T05:03:06.519Z",
+        "updatedAt": "2026-10-13T05:03:06.728Z",
+        "order": 49,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1791867785407-jucz",
+        "isUserCreated": true,
+        "projectId": "prj-1",
+        "projectName": "Kawach Product",
+        "projectKey": "KP",
+        "parentKey": "KP-5831",
+        "parentTitle": "Automation Test Cases",
+        "parentStatus": "IN_PROGRESS",
+        "key": "KP-6458",
+        "title": "E2E OAuth Token Rotation Verification 1791867785148",
+        "description": "Verify JWT access and refresh token rotation under concurrent load.",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": "iss-epic-kp-5831",
+        "sprintId": null,
+        "explicitNoSprint": false,
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 12,
+        "labels": [
+          "security",
+          "q4"
+        ],
+        "reviewers": [],
+        "approvers": [],
+        "createdAtText": "March 18, 2026 at 5:26 PM",
+        "updatedAtText": "March 18, 2026 at 5:26 PM",
+        "sourceUrl": "https://kawach.atlassian.net/browse/KP-6458",
+        "componentId": "cmp-frontend-spa",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-13",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-13T05:03:05.406Z",
+        "updatedAt": "2026-10-13T05:03:05.406Z",
+        "order": 48
+      },
+      {
+        "id": "iss-1791867765444-akhl",
+        "projectId": "prj-1",
+        "key": "KP-6457",
+        "title": "Kanban Drag Transition Test Issue",
+        "description": "",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-13",
+        "dueDate": "",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-1791867765544-hcze",
+            "authorId": "usr-1",
+            "body": "Hey @Arjun please review the updated SQL migration schema.",
+            "mentions": [
+              "Arjun"
+            ],
+            "createdAt": "2026-10-13T05:02:45.544Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [
+          {
+            "id": "hst-1791867765464-9fdn",
+            "actorId": "usr-1",
+            "field": "type",
+            "oldValue": "TASK",
+            "newValue": "STORY",
+            "timestamp": "2026-10-13T05:02:45.464Z"
+          },
+          {
+            "id": "hst-1791867765464-u7ak",
+            "actorId": "usr-1",
+            "field": "storyPoints",
+            "oldValue": "5",
+            "newValue": "0",
+            "timestamp": "2026-10-13T05:02:45.464Z"
+          },
+          {
+            "id": "hst-1791867765464-a1j4",
+            "actorId": "usr-1",
+            "field": "priority",
+            "oldValue": "HIGH",
+            "newValue": "MEDIUM",
+            "timestamp": "2026-10-13T05:02:45.464Z"
+          },
+          {
+            "id": "hst-1791867765464-x7af",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "TODO",
+            "newValue": "IN_PROGRESS",
+            "timestamp": "2026-10-13T05:02:45.464Z"
+          },
+          {
+            "id": "hst-1791867765444",
+            "actorId": "usr-1",
+            "field": "created",
+            "oldValue": "None",
+            "newValue": "TODO",
+            "timestamp": "2026-10-13T05:02:45.444Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-13T05:02:45.444Z",
+        "updatedAt": "2026-10-13T05:02:45.544Z",
+        "order": 47,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1791867763812-ni76",
+        "isUserCreated": true,
+        "projectId": "prj-1",
+        "projectName": "Kawach Product",
+        "projectKey": "KP",
+        "parentKey": "KP-5831",
+        "parentTitle": "Automation Test Cases",
+        "parentStatus": "IN_PROGRESS",
+        "key": "KP-6456",
+        "title": "E2E OAuth Token Rotation Verification 1791867763642",
+        "description": "Verify JWT access and refresh token rotation under concurrent load.",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": "iss-epic-kp-5831",
+        "sprintId": null,
+        "explicitNoSprint": false,
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 12,
+        "labels": [
+          "security",
+          "q4"
+        ],
+        "reviewers": [],
+        "approvers": [],
+        "createdAtText": "March 18, 2026 at 5:26 PM",
+        "updatedAtText": "March 18, 2026 at 5:26 PM",
+        "sourceUrl": "https://kawach.atlassian.net/browse/KP-6456",
+        "componentId": "cmp-frontend-spa",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-13",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-13T05:02:43.811Z",
+        "updatedAt": "2026-10-13T05:02:43.811Z",
+        "order": 46
+      },
+      {
+        "id": "iss-1791867743319-z274",
+        "projectId": "prj-1",
+        "key": "KP-6455",
+        "title": "Kanban Drag Transition Test Issue",
+        "description": "",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-13",
+        "dueDate": "",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-1791867743414-rhck",
+            "authorId": "usr-1",
+            "body": "Hey @Arjun please review the updated SQL migration schema.",
+            "mentions": [
+              "Arjun"
+            ],
+            "createdAt": "2026-10-13T05:02:23.414Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [
+          {
+            "id": "hst-1791867743350-1n7e",
+            "actorId": "usr-1",
+            "field": "type",
+            "oldValue": "TASK",
+            "newValue": "STORY",
+            "timestamp": "2026-10-13T05:02:23.350Z"
+          },
+          {
+            "id": "hst-1791867743350-agtl",
+            "actorId": "usr-1",
+            "field": "storyPoints",
+            "oldValue": "5",
+            "newValue": "0",
+            "timestamp": "2026-10-13T05:02:23.350Z"
+          },
+          {
+            "id": "hst-1791867743350-msip",
+            "actorId": "usr-1",
+            "field": "priority",
+            "oldValue": "HIGH",
+            "newValue": "MEDIUM",
+            "timestamp": "2026-10-13T05:02:23.350Z"
+          },
+          {
+            "id": "hst-1791867743350-e041",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "TODO",
+            "newValue": "IN_PROGRESS",
+            "timestamp": "2026-10-13T05:02:23.350Z"
+          },
+          {
+            "id": "hst-1791867743319",
+            "actorId": "usr-1",
+            "field": "created",
+            "oldValue": "None",
+            "newValue": "TODO",
+            "timestamp": "2026-10-13T05:02:23.319Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-13T05:02:23.319Z",
+        "updatedAt": "2026-10-13T05:02:23.414Z",
+        "order": 45,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1791867628358-vp8r",
+        "projectId": "prj-1",
+        "key": "KP-6454",
+        "title": "Kanban Drag Transition Test Issue",
+        "description": "",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": "spr-21",
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-13",
+        "dueDate": "",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-1791867628439-gn7u",
+            "authorId": "usr-1",
+            "body": "Hey @Arjun please review the updated SQL migration schema.",
+            "mentions": [
+              "Arjun"
+            ],
+            "createdAt": "2026-10-13T05:00:28.439Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [
+          {
+            "id": "hst-1791867628374-2m1t",
+            "actorId": "usr-1",
+            "field": "type",
+            "oldValue": "TASK",
+            "newValue": "STORY",
+            "timestamp": "2026-10-13T05:00:28.374Z"
+          },
+          {
+            "id": "hst-1791867628374-flu0",
+            "actorId": "usr-1",
+            "field": "storyPoints",
+            "oldValue": "5",
+            "newValue": "0",
+            "timestamp": "2026-10-13T05:00:28.374Z"
+          },
+          {
+            "id": "hst-1791867628374-cyi0",
+            "actorId": "usr-1",
+            "field": "priority",
+            "oldValue": "HIGH",
+            "newValue": "MEDIUM",
+            "timestamp": "2026-10-13T05:00:28.374Z"
+          },
+          {
+            "id": "hst-1791867628374-1rxk",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "TODO",
+            "newValue": "IN_PROGRESS",
+            "timestamp": "2026-10-13T05:00:28.374Z"
+          },
+          {
+            "id": "hst-1791867628358",
+            "actorId": "usr-1",
+            "field": "created",
+            "oldValue": "None",
+            "newValue": "TODO",
+            "timestamp": "2026-10-13T05:00:28.358Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-13T05:00:28.358Z",
+        "updatedAt": "2026-10-13T05:00:28.439Z",
+        "order": 44,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1791529589966-lagb",
+        "isUserCreated": true,
+        "projectId": "prj-2",
+        "key": "MOB-209",
+        "title": "Automation Test for Incidents List – Search, Filter and CRUD",
+        "description": "Story Title\nAutomation Test for Incidents List – Search, Filter and CRUD\n\nUser Story\nAs a KP user / QA engineer,\nI want Automation Test for Incidents List – Search, Filter and CRUD implemented and verified,\nSo that the module works reliably and regression issues are caught early.\n\nScope / Description\nThis story covers implementation and verification for: Automation Test for Incidents List – Search, Filter and CRUD.",
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-3",
+        "reporterId": "usr-4",
+        "epicId": "iss-1791433107246-aiyn",
+        "sprintId": "spr-mob-1",
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 12,
+        "labels": [
+          "security",
+          "q4"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-09",
+        "dueDate": "2026-10-16",
+        "subtasks": [
+          {
+            "id": "sub-1791529589967-0",
+            "key": "MOB-209-1",
+            "title": "Verify implementation and acceptance criteria for: Automation Test for Incidents List – Search, Filter and CRUD",
+            "completed": false,
+            "assigneeId": "usr-3"
+          }
+        ],
+        "attachments": [
+          {
+            "id": "att-pdf-1791529563346",
+            "name": "[KP-6454] Automation Test for Incidents List – Search, Filter and CRUD - Jira.pdf",
+            "size": "317 KB",
+            "uploadedAt": "2026-10-09"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4"
+        ],
+        "createdAt": "2026-10-09T07:06:29.966Z",
+        "updatedAt": "2026-10-09T07:06:29.966Z",
+        "order": 43
+      },
+      {
+        "id": "iss-1791433107246-aiyn",
+        "projectId": "prj-2",
+        "key": "MOB-206",
+        "title": "Skia/PDF m154",
+        "description": "### Extracted from Story PDF ([KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf)\nRj v         { |F  wu>N   1d  E#'  Y  e]    w!?`/  E%J W<< t{ N J  Y     1 c   K  + k\n&  u>S      B     { }F -^_:/t8   @  +    W :  dH S 3  r    :  d{     E%  B  w2&    e  |    b =P c    T .t8      g4 7 Ox  QL   |  K  W :  dH S 3 5 {NU^ p    : *\n$C  z Q - Fk   G1        h    G!         |  :  d{  W    &    wSH  = >     5^ p    :_S* s    G!      Jn-  / u7    =u6S*  h    B2$      5 :/t8   @  + A      B2$     Gn    _  5RL    }9\nk<T 1     =QA r   f   `  1      r   B   maM S\n>  h Q     X   VlC   5jc V}     G\nx'^      k q :   3  +  x       \"# % &   KdhB  2 S Z    6  n1 [E [     M w  HSrH 4P rl    kT  rZ } 9* W s    W   4 N D     9    S}3       O M  $  h     6m  w   g\n2> k   x f c  D T    k ^  '!   dt>n \"  $  + z  9    O      G   G  O    /     DxBC} Y [      * } H 3T n\n*aX\nd ^ h   hz   ?Oz  0I #\nb   #9   a z  k^?K     ?I ~      Y     2       c m2-| ^       Jaz jT t7 G2   a     8 6           ?C  D  Vx\nA J1Yl    MF  ?\nhttps://kawach-ai.atlassian.net/issues/?jql=project%20%3D%20%22KP%22%20AND%20component%20%3D%20%22Frontend%20SPA%22\nhttps://kawach-ai.atlassian.net/jira/projects\nhttps://kawach-ai.atlassian.net/browse/KP\nhttps://kawach-ai.atlassian.net/browse/KP-5831\nhttps://kawach-ai.atlassian.net/browse/KP-6453\nhttps://kawach-ai.atlassian.net/jira\nC F Y  =cT+    _[I    *G4 V AG  .  :$-@ ~ *     AXyZ  +*[Z       b * S%T H 9   `   Z  :6        A   e$ n   2 CD 8 `  q:  |\nL     [    -  d{      FN     3=      fN  3w5  U\ng Q W  I     lR$X  ^ E >1 :BU  \"  Yt  |  Y      , G\nu ! o * [ y   x        N      R           $. 7\"   r7   \"i  4  S- h     i M ^W      D  of     [  z I  } A   m  O~        k* w  0r\nF   JwY   D              u      i4 T =  3    t ,o  q~  <      Ih          R, 3  5  Q Lo ` X\"  ]=   s^  =      Z\nQ-p !7   Mg E >\n!0Jn] Xf9 1\"u Y      g _  fT   s@ g ;  b #  tF   rI |   N     8   pX%         j    V+     k   M   8C u  . O    ;   < @    ;   As\n\n### Acceptance Criteria\n- Verify all functional requirements specified in [KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf\n- Complete unit and integration test coverage\n- Validate performance and edge cases before QA sign-off",
+        "type": "EPIC",
+        "status": "TODO",
+        "priority": "HIGH",
+        "assigneeId": "usr-4",
+        "reporterId": "usr-4",
+        "epicId": "iss-201",
+        "sprintId": null,
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 12,
+        "labels": [
+          "pdf-story",
+          "auto-extracted",
+          "mob"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-22",
+        "subtasks": [
+          {
+            "id": "sub-1791433107246-0",
+            "key": "MOB-206-1",
+            "title": "Design & implement core logic for: Skia/PDF m154",
+            "completed": false,
+            "assigneeId": "usr-4"
+          },
+          {
+            "id": "sub-1791433107246-1",
+            "key": "MOB-206-2",
+            "title": "Validate acceptance criteria from [KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf",
+            "completed": false,
+            "assigneeId": "usr-4"
+          },
+          {
+            "id": "sub-1791433107246-2",
+            "key": "MOB-206-3",
+            "title": "Write automated regression tests and complete QA verification",
+            "completed": false,
+            "assigneeId": "usr-4"
+          }
+        ],
+        "attachments": [
+          {
+            "id": "att-pdf-1791433107245",
+            "name": "[KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf",
+            "size": "321 KB",
+            "uploadedAt": "2026-10-08"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4"
+        ],
+        "createdAt": "2026-10-08T04:18:27.245Z",
+        "updatedAt": "2026-10-08T04:18:27.245Z",
+        "order": 32,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1791459222417-etil",
+        "isUserCreated": true,
+        "projectId": "prj-2",
+        "key": "MOB-207",
+        "title": "er4e",
+        "description": "",
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-4",
+        "reporterId": "usr-4",
+        "epicId": "iss-201",
+        "sprintId": "spr-mob-1",
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 12,
+        "labels": [
+          "security",
+          "q4"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4"
+        ],
+        "createdAt": "2026-10-08T11:33:42.417Z",
+        "updatedAt": "2026-10-08T11:33:42.417Z",
+        "order": 33
+      },
+      {
+        "id": "iss-1791459286882-vjkc",
+        "isUserCreated": true,
+        "projectId": "prj-2",
+        "key": "MOB-208",
+        "title": "Skia/PDF m154",
+        "description": "### Extracted from Story PDF ([KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf)\nRj v         { |F  wu>N   1d  E#'  Y  e]    w!?`/  E%J W<< t{ N J  Y     1 c   K  + k\n&  u>S      B     { }F -^_:/t8   @  +    W :  dH S 3  r    :  d{     E%  B  w2&    e  |    b =P c    T .t8      g4 7 Ox  QL   |  K  W :  dH S 3 5 {NU^ p    : *\n$C  z Q - Fk   G1        h    G!         |  :  d{  W    &    wSH  = >     5^ p    :_S* s    G!      Jn-  / u7    =u6S*  h    B2$      5 :/t8   @  + A      B2$     Gn    _  5RL    }9\nk<T 1     =QA r   f   `  1      r   B   maM S\n>  h Q     X   VlC   5jc V}     G\nx'^      k q :   3  +  x       \"# % &   KdhB  2 S Z    6  n1 [E [     M w  HSrH 4P rl    kT  rZ } 9* W s    W   4 N D     9    S}3       O M  $  h     6m  w   g\n2> k   x f c  D T    k ^  '!   dt>n \"  $  + z  9    O      G   G  O    /     DxBC} Y [      * } H 3T n\n*aX\nd ^ h   hz   ?Oz  0I #\nb   #9   a z  k^?K     ?I ~      Y     2       c m2-| ^       Jaz jT t7 G2   a     8 6           ?C  D  Vx\nA J1Yl    MF  ?\nhttps://kawach-ai.atlassian.net/issues/?jql=project%20%3D%20%22KP%22%20AND%20component%20%3D%20%22Frontend%20SPA%22\nhttps://kawach-ai.atlassian.net/jira/projects\nhttps://kawach-ai.atlassian.net/browse/KP\nhttps://kawach-ai.atlassian.net/browse/KP-5831\nhttps://kawach-ai.atlassian.net/browse/KP-6453\nhttps://kawach-ai.atlassian.net/jira\nC F Y  =cT+    _[I    *G4 V AG  .  :$-@ ~ *     AXyZ  +*[Z       b * S%T H 9   `   Z  :6        A   e$ n   2 CD 8 `  q:  |\nL     [    -  d{      FN     3=      fN  3w5  U\ng Q W  I     lR$X  ^ E >1 :BU  \"  Yt  |  Y      , G\nu ! o * [ y   x        N      R           $. 7\"   r7   \"i  4  S- h     i M ^W      D  of     [  z I  } A   m  O~        k* w  0r\nF   JwY   D              u      i4 T =  3    t ,o  q~  <      Ih          R, 3  5  Q Lo ` X\"  ]=   s^  =      Z\nQ-p !7   Mg E >\n!0Jn] Xf9 1\"u Y      g _  fT   s@ g ;  b #  tF   rI |   N     8   pX%         j    V+     k   M   8C u  . O    ;   < @    ;   As\n\n### Acceptance Criteria\n- Verify all functional requirements specified in [KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf\n- Complete unit and integration test coverage\n- Validate performance and edge cases before QA sign-off",
+        "type": "EPIC",
+        "status": "TODO",
+        "priority": "HIGH",
+        "assigneeId": "usr-4",
+        "reporterId": "usr-4",
+        "epicId": "iss-201",
+        "sprintId": null,
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 12,
+        "labels": [
+          "pdf-story",
+          "auto-extracted",
+          "mob"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-08",
+        "dueDate": "2026-10-22",
+        "subtasks": [
+          {
+            "id": "sub-1791459286882-0",
+            "key": "MOB-208-1",
+            "title": "Design & implement core logic for: Skia/PDF m154",
+            "completed": false,
+            "assigneeId": "usr-4"
+          },
+          {
+            "id": "sub-1791459286882-1",
+            "key": "MOB-208-2",
+            "title": "Validate acceptance criteria from [KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf",
+            "completed": false,
+            "assigneeId": "usr-4"
+          },
+          {
+            "id": "sub-1791459286882-2",
+            "key": "MOB-208-3",
+            "title": "Write automated regression tests and complete QA verification",
+            "completed": false,
+            "assigneeId": "usr-4"
+          }
+        ],
+        "attachments": [
+          {
+            "id": "att-pdf-1791459265161",
+            "name": "[KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf",
+            "size": "321 KB",
+            "uploadedAt": "2026-10-08"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4"
+        ],
+        "createdAt": "2026-10-08T11:34:46.882Z",
+        "updatedAt": "2026-10-08T11:34:46.882Z",
+        "order": 34
+      },
+      {
+        "id": "iss-epic-kp-5831",
+        "projectId": "prj-1",
+        "key": "KP-5831",
+        "title": "Automation Test Cases",
+        "description": "Parent Epic tracking end-to-end QA automation test suites across Kawach Product modules including Vulnerabilities List, Search, Filter, and Show/Details pages.",
+        "type": "EPIC",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-6",
+        "reporterId": "usr-6",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 40,
+        "timeSpentHours": 12,
+        "remainingEstimateHours": 28,
+        "labels": [
+          "automation",
+          "qa-suite"
+        ],
+        "componentId": "cmp-frontend-spa",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-03-10",
+        "dueDate": "2026-10-30",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-6",
+          "usr-1"
+        ],
+        "createdAt": "2026-03-18T17:26:00.000Z",
+        "updatedAt": "2026-03-18T17:26:00.000Z",
+        "order": 0
+      },
+      {
+        "id": "iss-kp-6453",
+        "isUserCreated": true,
+        "projectId": "prj-1",
+        "key": "KP-6453",
+        "projectName": "Kawach Product",
+        "projectKey": "KP",
+        "parentKey": "KP-5831",
+        "parentTitle": "Automation Test Cases",
+        "parentStatus": "IN_PROGRESS",
+        "title": "Automation Test for Vulnerabilities List – Search, Filter and Show Page",
+        "description": "Story Title\nAutomation Test for Vulnerabilities List – Search, Filter and Show Page\n\nUser Story\nAs a Kawach user / QA engineer,\nI want automated tests to verify the Vulnerabilities List page functionalities including search, filters, and viewing vulnerability details,\nSo that we can ensure the vulnerabilities module works reliably and regression issues are caught early.\n\nScope / Description\nThis story covers automation testing for the Vulnerabilities section (/vulnerabilities) in the Kawach application.\nThe automation script should validate the following flows:\n1. Navigate to the Vulnerabilities page\n2. Search vulnerabilities using the search bar\n3. Apply filters to narrow down vulnerability results\n4. Open a vulnerability item and verify the Show (Details) page\n\nAcceptance Criteria\n\nScenario 1: Verify Vulnerabilities List Page Load\n• Given the user is logged into the Kawach portal\n• When the user navigates to /vulnerabilities\n• Then the Vulnerabilities list page should load successfully\n• And the table/list of vulnerabilities should be displayed\n• And search and filter options should be visible.\n\nScenario 2: Verify Search Functionality\n• Given the user is on the Vulnerabilities list page\n• When the user enters a valid keyword (e.g., CVE ID / vulnerability name / package name) into the search input\n• Then the list should update to show matching vulnerability records\n• And non-matching records should not be displayed\n• And if a random/non-existing keyword is entered, an appropriate empty state message should be shown.\n\nScenario 3: Verify Filter Functionality\n• Given the user is on the Vulnerabilities list page\n• When the user applies one or more filters (such as Severity, Status, Project, Package, etc.)\n• Then the vulnerability list should refresh and display only records matching the selected filter criteria\n• And clearing/resetting the filter should restore the full vulnerability list.\n\nScenario 4: Verify Vulnerability Show / Details Page\n• Given the user has searched and/or filtered the vulnerabilities list\n• When the user clicks on a vulnerability record (or the View/Show action)\n• Then the Vulnerability Show/Details page should open\n• And key details (such as Vulnerability ID/CVE, Severity, Status, Affected Package/Component, Description/Remediation details) should be visible and match the selected record.\n\nTest Cases to Automate\n1. Verify navigation to /vulnerabilities page and initial table load\n2. Verify search with valid vulnerability name / CVE ID\n3. Verify search with invalid keyword shows \"No data / No vulnerabilities found\"\n4. Verify single filter application (e.g., Severity = Critical/High)\n5. Verify multiple filter combinations (if supported)\n6. Verify clear/reset filter behavior\n7. Verify clicking a vulnerability opens the Show page and displays accurate details\n8. Verify back navigation from Show page returns to the Vulnerabilities list.\n\nDefinition of Done (DoD)\n• Automation scripts written and executed successfully\n• Covers Search, Filter, and Show page validation on /vulnerabilities\n• Assertions added for table data, filter results, and show page fields\n• Test runs cleanly in local/CI environment without flakiness\n• Code reviewed and merged into the automation repository.",
+        "userStory": "As a Kawach user / QA engineer,\nI want automated tests to verify the Vulnerabilities List page functionalities including search, filters, and viewing vulnerability details,\nSo that we can ensure the vulnerabilities module works reliably and regression issues are caught early.",
+        "scopeDescription": "This story covers automation testing for the Vulnerabilities section (/vulnerabilities) in the Kawach application.\nThe automation script should validate the following flows:\n1. Navigate to the Vulnerabilities page\n2. Search vulnerabilities using the search bar\n3. Apply filters to narrow down vulnerability results\n4. Open a vulnerability item and verify the Show (Details) page",
+        "acceptanceCriteria": [
+          {
+            "scenarioTitle": "Scenario 1: Verify Vulnerabilities List Page Load",
+            "steps": [
+              "Given the user is logged into the Kawach portal",
+              "When the user navigates to /vulnerabilities",
+              "Then the Vulnerabilities list page should load successfully",
+              "And the table/list of vulnerabilities should be displayed",
+              "And search and filter options should be visible."
+            ]
+          },
+          {
+            "scenarioTitle": "Scenario 2: Verify Search Functionality",
+            "steps": [
+              "Given the user is on the Vulnerabilities list page",
+              "When the user enters a valid keyword (e.g., CVE ID / vulnerability name / package name) into the search input",
+              "Then the list should update to show matching vulnerability records",
+              "And non-matching records should not be displayed",
+              "And if a random/non-existing keyword is entered, an appropriate empty state message should be shown."
+            ]
+          },
+          {
+            "scenarioTitle": "Scenario 3: Verify Filter Functionality",
+            "steps": [
+              "Given the user is on the Vulnerabilities list page",
+              "When the user applies one or more filters (such as Severity, Status, Project, Package, etc.)",
+              "Then the vulnerability list should refresh and display only records matching the selected filter criteria",
+              "And clearing/resetting the filter should restore the full vulnerability list."
+            ]
+          },
+          {
+            "scenarioTitle": "Scenario 4: Verify Vulnerability Show / Details Page",
+            "steps": [
+              "Given the user has searched and/or filtered the vulnerabilities list",
+              "When the user clicks on a vulnerability record (or the View/Show action)",
+              "Then the Vulnerability Show/Details page should open",
+              "And key details (such as Vulnerability ID/CVE, Severity, Status, Affected Package/Component, Description/Remediation details) should be visible and match the selected record."
+            ]
+          }
+        ],
+        "testCases": [
+          "Verify navigation to /vulnerabilities page and initial table load",
+          "Verify search with valid vulnerability name / CVE ID",
+          "Verify search with invalid keyword shows \"No data / No vulnerabilities found\"",
+          "Verify single filter application (e.g., Severity = Critical/High)",
+          "Verify multiple filter combinations (if supported)",
+          "Verify clear/reset filter behavior",
+          "Verify clicking a vulnerability opens the Show page and displays accurate details",
+          "Verify back navigation from Show page returns to the Vulnerabilities list."
+        ],
+        "definitionOfDone": [
+          "Automation scripts written and executed successfully",
+          "Covers Search, Filter, and Show page validation on /vulnerabilities",
+          "Assertions added for table data, filter results, and show page fields",
+          "Test runs cleanly in local/CI environment without flakiness",
+          "Code reviewed and merged into the automation repository."
+        ],
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-6",
+        "reporterId": "usr-6",
+        "epicId": "iss-epic-kp-5831",
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "reviewers": [],
+        "approvers": [],
+        "componentId": "cmp-frontend-spa",
+        "componentName": "Frontend SPA",
+        "fixVersionId": null,
+        "startDate": "2026-03-18",
+        "dueDate": "",
+        "createdAtText": "March 18, 2026 at 5:26 PM",
+        "updatedAtText": "March 18, 2026 at 5:26 PM",
+        "sourceUrl": "https://kawach.atlassian.net/browse/KP-6453",
+        "subtasks": [
+          {
+            "id": "sub-kp-6453-1",
+            "key": "KP-6453-1",
+            "title": "Verify navigation to /vulnerabilities page and initial table load",
+            "completed": false,
+            "assigneeId": "usr-6"
+          },
+          {
+            "id": "sub-kp-6453-2",
+            "key": "KP-6453-2",
+            "title": "Verify search with valid vulnerability name / CVE ID",
+            "completed": false,
+            "assigneeId": "usr-6"
+          },
+          {
+            "id": "sub-kp-6453-3",
+            "key": "KP-6453-3",
+            "title": "Verify search with invalid keyword shows \"No data / No vulnerabilities found\"",
+            "completed": false,
+            "assigneeId": "usr-6"
+          },
+          {
+            "id": "sub-kp-6453-4",
+            "key": "KP-6453-4",
+            "title": "Verify single filter application (e.g., Severity = Critical/High)",
+            "completed": false,
+            "assigneeId": "usr-6"
+          },
+          {
+            "id": "sub-kp-6453-5",
+            "key": "KP-6453-5",
+            "title": "Verify multiple filter combinations (if supported)",
+            "completed": false,
+            "assigneeId": "usr-6"
+          },
+          {
+            "id": "sub-kp-6453-6",
+            "key": "KP-6453-6",
+            "title": "Verify clear/reset filter behavior",
+            "completed": false,
+            "assigneeId": "usr-6"
+          },
+          {
+            "id": "sub-kp-6453-7",
+            "key": "KP-6453-7",
+            "title": "Verify clicking a vulnerability opens the Show page and displays accurate details",
+            "completed": false,
+            "assigneeId": "usr-6"
+          },
+          {
+            "id": "sub-kp-6453-8",
+            "key": "KP-6453-8",
+            "title": "Verify back navigation from Show page returns to the Vulnerabilities list.",
+            "completed": false,
+            "assigneeId": "usr-6"
+          }
+        ],
+        "attachments": [
+          {
+            "id": "att-kp-6453-pdf",
+            "name": "[KP-6453] Automation Test for Vulnerabilities List – Search, Filter and Show Page - Jira.pdf",
+            "size": "284 KB",
+            "uploadedAt": "2026-03-18"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-6",
+          "usr-1"
+        ],
+        "createdAt": "2026-03-18T17:26:00.000Z",
+        "updatedAt": "2026-03-18T17:26:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-epic-1",
+        "projectId": "prj-1",
+        "key": "KAW-101",
+        "title": "Zero-Trust Identity & RBAC Enforcement",
+        "description": "Establish fine-grained role-based access control, hardware MFA enforcement, and session token rotation across all microservices.",
+        "type": "EPIC",
+        "status": "IN_PROGRESS",
+        "priority": "HIGHEST",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-5",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 80,
+        "timeSpentHours": 46,
+        "remainingEstimateHours": 34,
+        "labels": [
+          "zero-trust",
+          "security",
+          "q4-roadmap"
+        ],
+        "componentId": "cmp-1",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-09-20",
+        "dueDate": "2026-10-18",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1",
+          "usr-5"
+        ],
+        "createdAt": "2026-09-15T10:00:00.000Z",
+        "updatedAt": "2026-10-04T12:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-epic-2",
+        "projectId": "prj-1",
+        "key": "KAW-102",
+        "title": "Real-Time Threat Telemetry & Anomaly Graph",
+        "description": "Build sub-second event ingestion pipeline and interactive topology graph to surface lateral movement alerts.",
+        "type": "EPIC",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-3",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 96,
+        "timeSpentHours": 38,
+        "remainingEstimateHours": 58,
+        "labels": [
+          "telemetry",
+          "streaming",
+          "graph"
+        ],
+        "componentId": "cmp-2",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-09-25",
+        "dueDate": "2026-10-25",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1",
+          "usr-3"
+        ],
+        "createdAt": "2026-09-18T11:00:00.000Z",
+        "updatedAt": "2026-10-04T15:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-epic-3",
+        "projectId": "prj-1",
+        "key": "KAW-103",
+        "title": "Executive Compliance & Sprint Analytics Suite",
+        "description": "Deliver SOC2 continuous compliance checks, velocity burndown charts, and automated audit trail exports.",
+        "type": "EPIC",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-2",
+        "reporterId": "usr-5",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 64,
+        "timeSpentHours": 12,
+        "remainingEstimateHours": 52,
+        "labels": [
+          "compliance",
+          "analytics",
+          "soc2"
+        ],
+        "componentId": "cmp-4",
+        "fixVersionId": "rel-3",
+        "startDate": "2026-10-05",
+        "dueDate": "2026-11-02",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-2",
+          "usr-4",
+          "usr-5"
+        ],
+        "createdAt": "2026-09-22T09:30:00.000Z",
+        "updatedAt": "2026-10-03T10:00:00.000Z",
+        "order": 3
+      },
+      {
+        "id": "iss-104",
+        "projectId": "prj-1",
+        "key": "KAW-104",
+        "title": "Implement mTLS certificate rotation for edge gateway nodes",
+        "description": "Configure automated X.509 short-lived certificate issuance via HashiCorp Vault PKI engine with zero-downtime reload on Envoy proxies.",
+        "type": "STORY",
+        "status": "DONE",
+        "priority": "HIGHEST",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": "iss-epic-1",
+        "sprintId": "spr-21",
+        "storyPoints": 8,
+        "originalEstimateHours": 20,
+        "timeSpentHours": 19,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "mtls",
+          "security",
+          "envoy"
+        ],
+        "componentId": "cmp-1",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-09-28",
+        "dueDate": "2026-10-03",
+        "subtasks": [
+          {
+            "id": "sub-1",
+            "key": "KAW-104-1",
+            "title": "Configure Vault PKI intermediate CA role",
+            "completed": true,
+            "assigneeId": "usr-1"
+          },
+          {
+            "id": "sub-2",
+            "key": "KAW-104-2",
+            "title": "Add SDS gRPC rotation listener in Envoy",
+            "completed": true,
+            "assigneeId": "usr-3"
+          },
+          {
+            "id": "sub-3",
+            "key": "KAW-104-3",
+            "title": "Verify zero dropped requests under load test",
+            "completed": true,
+            "assigneeId": "usr-4"
+          }
+        ],
+        "links": [
+          {
+            "id": "lnk-1",
+            "type": "BLOCKS",
+            "targetIssueId": "iss-106"
+          }
+        ],
+        "comments": [
+          {
+            "id": "cmt-1",
+            "authorId": "usr-4",
+            "body": "Load test passed with 15,000 req/s during certificate rollover. Zero TLS handshake failures observed.",
+            "createdAt": "2026-10-03T14:20:00.000Z"
+          }
+        ],
+        "workLogs": [
+          {
+            "id": "wl-1",
+            "authorId": "usr-1",
+            "hoursSpent": 12,
+            "comment": "Implemented Vault PKI client and Envoy SDS connector.",
+            "loggedAt": "2026-10-01T18:00:00.000Z"
+          },
+          {
+            "id": "wl-2",
+            "authorId": "usr-4",
+            "hoursSpent": 7,
+            "comment": "Automated k6 stress testing for certificate rotation.",
+            "loggedAt": "2026-10-03T15:00:00.000Z"
+          }
+        ],
+        "history": [
+          {
+            "id": "hst-1",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "QA",
+            "newValue": "DONE",
+            "timestamp": "2026-10-03T16:00:00.000Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1",
+          "usr-3",
+          "usr-4"
+        ],
+        "createdAt": "2026-09-26T09:00:00.000Z",
+        "updatedAt": "2026-10-03T16:00:00.000Z",
+        "order": 4
+      },
+      {
+        "id": "iss-105",
+        "projectId": "prj-1",
+        "key": "KAW-105",
+        "title": "Fix race condition in concurrent WebSocket telemetry frame parser",
+        "description": "When two worker threads flush compressed snappy frames simultaneously, sequence counters occasionally drift causing false-positive drop alerts.",
+        "type": "BUG",
+        "status": "IN_PROGRESS",
+        "priority": "HIGHEST",
+        "assigneeId": "usr-3",
+        "reporterId": "usr-4",
+        "epicId": "iss-epic-2",
+        "sprintId": "spr-21",
+        "storyPoints": 5,
+        "originalEstimateHours": 14,
+        "timeSpentHours": 9,
+        "remainingEstimateHours": 5,
+        "labels": [
+          "concurrency",
+          "websocket",
+          "critical-bug"
+        ],
+        "componentId": "cmp-2",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-01",
+        "dueDate": "2026-10-08",
+        "subtasks": [
+          {
+            "id": "sub-4",
+            "key": "KAW-105-1",
+            "title": "Reproduce race condition with deterministic thread barrier test",
+            "completed": true,
+            "assigneeId": "usr-3"
+          },
+          {
+            "id": "sub-5",
+            "key": "KAW-105-2",
+            "title": "Replace shared counter with atomic ring buffer cursor",
+            "completed": false,
+            "assigneeId": "usr-3"
+          }
+        ],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-2",
+            "authorId": "usr-3",
+            "body": "Root cause isolated to non-atomic sequence increment in `FrameIngestor.ts:142`. Patching with Atomics.add.",
+            "createdAt": "2026-10-05T11:15:00.000Z"
+          }
+        ],
+        "workLogs": [
+          {
+            "id": "wl-3",
+            "authorId": "usr-3",
+            "hoursSpent": 9,
+            "comment": "Built reproduction harness and benchmarked atomic cursor.",
+            "loggedAt": "2026-10-05T17:30:00.000Z"
+          }
+        ],
+        "history": [],
+        "watcherIds": [
+          "usr-1",
+          "usr-3",
+          "usr-4"
+        ],
+        "createdAt": "2026-09-29T10:00:00.000Z",
+        "updatedAt": "2026-10-05T17:30:00.000Z",
+        "order": 5
+      },
+      {
+        "id": "iss-106",
+        "projectId": "prj-1",
+        "key": "KAW-106",
+        "title": "Build interactive RBAC permission matrix editor with live policy diff",
+        "description": "Allow security administrators to toggle resource scopes per role, preview effective permissions, and require dual-approval before publishing policy changes.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-2",
+        "reporterId": "usr-5",
+        "epicId": "iss-epic-1",
+        "sprintId": "spr-21",
+        "storyPoints": 8,
+        "originalEstimateHours": 24,
+        "timeSpentHours": 14,
+        "remainingEstimateHours": 10,
+        "labels": [
+          "rbac",
+          "frontend",
+          "ux"
+        ],
+        "componentId": "cmp-3",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-02",
+        "dueDate": "2026-10-10",
+        "subtasks": [
+          {
+            "id": "sub-6",
+            "key": "KAW-106-1",
+            "title": "Design role-to-scope virtualized matrix grid",
+            "completed": true,
+            "assigneeId": "usr-2"
+          },
+          {
+            "id": "sub-7",
+            "key": "KAW-106-2",
+            "title": "Implement JSON policy diff viewer modal",
+            "completed": true,
+            "assigneeId": "usr-2"
+          },
+          {
+            "id": "sub-8",
+            "key": "KAW-106-3",
+            "title": "Connect optimistic mutation & audit log hook",
+            "completed": false,
+            "assigneeId": "usr-2"
+          }
+        ],
+        "links": [
+          {
+            "id": "lnk-2",
+            "type": "IS_BLOCKED_BY",
+            "targetIssueId": "iss-104"
+          }
+        ],
+        "comments": [],
+        "workLogs": [
+          {
+            "id": "wl-4",
+            "authorId": "usr-2",
+            "hoursSpent": 14,
+            "comment": "Completed matrix table component and keyboard navigation.",
+            "loggedAt": "2026-10-04T19:00:00.000Z"
+          }
+        ],
+        "history": [],
+        "watcherIds": [
+          "usr-2",
+          "usr-5"
+        ],
+        "createdAt": "2026-09-27T13:00:00.000Z",
+        "updatedAt": "2026-10-04T19:00:00.000Z",
+        "order": 6
+      },
+      {
+        "id": "iss-107",
+        "projectId": "prj-1",
+        "key": "KAW-107",
+        "title": "Add AQL query autocomplete and syntax validator for security events",
+        "description": "Support structured filtering by `assignee`, `priority`, `status`, `type`, `component`, and free-text summary search with instant table updates.",
+        "type": "STORY",
+        "status": "IN_REVIEW",
+        "priority": "HIGH",
+        "assigneeId": "usr-2",
+        "reporterId": "usr-1",
+        "epicId": "iss-epic-3",
+        "sprintId": "spr-21",
+        "storyPoints": 5,
+        "originalEstimateHours": 16,
+        "timeSpentHours": 14,
+        "remainingEstimateHours": 2,
+        "labels": [
+          "aql",
+          "search",
+          "ui"
+        ],
+        "componentId": "cmp-3",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-09-30",
+        "dueDate": "2026-10-09",
+        "subtasks": [
+          {
+            "id": "sub-9",
+            "key": "KAW-107-1",
+            "title": "Build AQL tokenizer and AST evaluator",
+            "completed": true,
+            "assigneeId": "usr-2"
+          },
+          {
+            "id": "sub-10",
+            "key": "KAW-107-2",
+            "title": "Add saved filter presets in left rail",
+            "completed": true,
+            "assigneeId": "usr-2"
+          }
+        ],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-3",
+            "authorId": "usr-1",
+            "body": "PR #418 looks super clean. Reviewing edge cases on quoted string literals.",
+            "createdAt": "2026-10-05T16:10:00.000Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1",
+          "usr-2"
+        ],
+        "createdAt": "2026-09-28T11:00:00.000Z",
+        "updatedAt": "2026-10-05T16:10:00.000Z",
+        "order": 7
+      },
+      {
+        "id": "iss-108",
+        "projectId": "prj-1",
+        "key": "KAW-108",
+        "title": "Verify SOC2 CC6.1 access revocation audit trail integrity",
+        "description": "Run end-to-end verification ensuring that revoked API tokens are rejected within 500ms across all regional edge caches and logged to immutable storage.",
+        "type": "TASK",
+        "status": "QA",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-4",
+        "reporterId": "usr-5",
+        "epicId": "iss-epic-1",
+        "sprintId": "spr-21",
+        "storyPoints": 3,
+        "originalEstimateHours": 10,
+        "timeSpentHours": 8,
+        "remainingEstimateHours": 2,
+        "labels": [
+          "soc2",
+          "qa",
+          "audit"
+        ],
+        "componentId": "cmp-4",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-01",
+        "dueDate": "2026-10-08",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4",
+          "usr-5"
+        ],
+        "createdAt": "2026-09-29T15:00:00.000Z",
+        "updatedAt": "2026-10-05T09:00:00.000Z",
+        "order": 8
+      },
+      {
+        "id": "iss-109",
+        "projectId": "prj-1",
+        "key": "KAW-109",
+        "title": "Implement Geo-IP impossible travel anomaly detector rule",
+        "description": "Flag authentication events originating from two distant geographic coordinates within an impossible flight time window.",
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "HIGH",
+        "assigneeId": "usr-3",
+        "reporterId": "usr-1",
+        "epicId": "iss-epic-2",
+        "sprintId": "spr-21",
+        "storyPoints": 5,
+        "originalEstimateHours": 15,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 15,
+        "labels": [
+          "anomaly",
+          "geoip",
+          "security"
+        ],
+        "componentId": "cmp-2",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-06",
+        "dueDate": "2026-10-12",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1",
+          "usr-3"
+        ],
+        "createdAt": "2026-09-30T10:00:00.000Z",
+        "updatedAt": "2026-09-30T10:00:00.000Z",
+        "order": 9
+      },
+      {
+        "id": "iss-110",
+        "projectId": "prj-1",
+        "key": "KAW-110",
+        "title": "Memory spike in PDF compliance report generator on 50k+ rows",
+        "description": "Switch PDF table builder from DOM buffer to streaming chunk writer to keep heap usage below 256MB.",
+        "type": "BUG",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-4",
+        "reporterId": "usr-4",
+        "epicId": "iss-epic-3",
+        "sprintId": "spr-21",
+        "storyPoints": 3,
+        "originalEstimateHours": 8,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 8,
+        "labels": [
+          "memory",
+          "pdf",
+          "performance"
+        ],
+        "componentId": "cmp-4",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-11",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4"
+        ],
+        "createdAt": "2026-10-01T08:30:00.000Z",
+        "updatedAt": "2026-10-01T08:30:00.000Z",
+        "order": 10
+      },
+      {
+        "id": "iss-111",
+        "projectId": "prj-1",
+        "key": "KAW-111",
+        "title": "Create Sprint Burndown & Cumulative Flow telemetry charts",
+        "description": "Render real-time SVG sprint burndown vs ideal guideline, velocity bar chart across sprints, and status distribution breakdown.",
+        "type": "STORY",
+        "status": "DONE",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-5",
+        "reporterId": "usr-5",
+        "epicId": "iss-epic-3",
+        "sprintId": "spr-21",
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 11,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "charts",
+          "analytics",
+          "velocity"
+        ],
+        "componentId": "cmp-4",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-09-29",
+        "dueDate": "2026-10-04",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-2",
+          "usr-5"
+        ],
+        "createdAt": "2026-09-28T16:00:00.000Z",
+        "updatedAt": "2026-10-04T11:00:00.000Z",
+        "order": 11
+      },
+      {
+        "id": "iss-112",
+        "projectId": "prj-1",
+        "key": "KAW-112",
+        "title": "Automated Slack & PagerDuty incident webhook dispatcher",
+        "description": "Dispatch signed HMAC webhook payloads with severity routing and one-click acknowledge buttons when critical anomalies trigger.",
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "HIGH",
+        "assigneeId": "usr-3",
+        "reporterId": "usr-5",
+        "epicId": "iss-epic-2",
+        "sprintId": "spr-22",
+        "storyPoints": 8,
+        "originalEstimateHours": 20,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 20,
+        "labels": [
+          "webhooks",
+          "integrations",
+          "incident"
+        ],
+        "componentId": "cmp-2",
+        "fixVersionId": "rel-3",
+        "startDate": "2026-10-13",
+        "dueDate": "2026-10-22",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-3",
+          "usr-5"
+        ],
+        "createdAt": "2026-10-02T10:00:00.000Z",
+        "updatedAt": "2026-10-02T10:00:00.000Z",
+        "order": 12
+      },
+      {
+        "id": "iss-113",
+        "projectId": "prj-1",
+        "key": "KAW-113",
+        "title": "Support hardware FIDO2 YubiKey attestation in admin portal",
+        "description": "Enforce WebAuthn resident key registration for privileged super-admin actions.",
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": "iss-epic-1",
+        "sprintId": null,
+        "storyPoints": 5,
+        "originalEstimateHours": 16,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 16,
+        "labels": [
+          "webauthn",
+          "fido2",
+          "security"
+        ],
+        "componentId": "cmp-1",
+        "fixVersionId": "rel-3",
+        "startDate": "2026-10-15",
+        "dueDate": "2026-10-28",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-03T09:00:00.000Z",
+        "updatedAt": "2026-10-03T09:00:00.000Z",
+        "order": 13
+      },
+      {
+        "id": "iss-114",
+        "projectId": "prj-1",
+        "key": "KAW-114",
+        "title": "Add dark-contrast keyboard shortcut cheat sheet modal",
+        "description": "Allow power users to press `?` or use quick filters to jump across boards, backlog, and issue creation.",
+        "type": "TASK",
+        "status": "TODO",
+        "priority": "LOW",
+        "assigneeId": null,
+        "reporterId": "usr-2",
+        "epicId": "iss-epic-3",
+        "sprintId": null,
+        "storyPoints": 2,
+        "originalEstimateHours": 6,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 6,
+        "labels": [
+          "ux",
+          "shortcuts"
+        ],
+        "componentId": "cmp-3",
+        "fixVersionId": "rel-3",
+        "startDate": "2026-10-18",
+        "dueDate": "2026-10-29",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-2"
+        ],
+        "createdAt": "2026-10-03T12:00:00.000Z",
+        "updatedAt": "2026-10-03T12:00:00.000Z",
+        "order": 14
+      },
+      {
+        "id": "iss-201",
+        "projectId": "prj-2",
+        "key": "MOB-201",
+        "title": "Biometric FaceID & TouchID Secure Enclave keypair binding",
+        "description": "Generate non-exportable ECDSA P-256 keys inside iOS Secure Enclave and Android StrongBox.",
+        "type": "EPIC",
+        "status": "IN_PROGRESS",
+        "priority": "HIGHEST",
+        "assigneeId": "usr-2",
+        "reporterId": "usr-5",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 60,
+        "timeSpentHours": 20,
+        "remainingEstimateHours": 40,
+        "labels": [
+          "biometrics",
+          "mobile"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-09-29",
+        "dueDate": "2026-10-22",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-2",
+          "usr-5"
+        ],
+        "createdAt": "2026-09-29T09:00:00.000Z",
+        "updatedAt": "2026-10-04T09:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-202",
+        "projectId": "prj-2",
+        "key": "MOB-202",
+        "title": "Implement push challenge number-matching verification screen",
+        "description": "Prevent MFA fatigue attacks by requiring the user to select the matching 2-digit entropy code displayed on the login screen.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-2",
+        "reporterId": "usr-5",
+        "epicId": "iss-201",
+        "sprintId": "spr-mob-1",
+        "storyPoints": 5,
+        "originalEstimateHours": 14,
+        "timeSpentHours": 6,
+        "remainingEstimateHours": 8,
+        "labels": [
+          "mfa",
+          "push",
+          "ios"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-01",
+        "dueDate": "2026-10-12",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-2"
+        ],
+        "createdAt": "2026-10-01T10:00:00.000Z",
+        "updatedAt": "2026-10-04T10:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-personal-usr-1-1",
+        "projectId": "prj-personal-usr-1",
+        "key": "AMP-101",
+        "title": "Set up personal sprint goals and quarterly OKRs for Arjun Mehta",
+        "description": "Personal workspace task for Arjun Mehta (Core Platform). Track individual priorities, architecture notes, and deliverables.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-1",
+        "storyPoints": 5,
+        "originalEstimateHours": 10,
+        "timeSpentHours": 3,
+        "remainingEstimateHours": 7,
+        "labels": [
+          "personal-space",
+          "okr"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-14",
+        "subtasks": [
+          {
+            "id": "sub-pers-usr-1-1",
+            "key": "AMP-101-1",
+            "title": "Review personal backlog items",
+            "completed": true,
+            "assigneeId": "usr-1"
+          },
+          {
+            "id": "sub-pers-usr-1-2",
+            "key": "AMP-101-2",
+            "title": "Finalize weekly execution schedule",
+            "completed": false,
+            "assigneeId": "usr-1"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-personal-usr-1-2",
+        "projectId": "prj-personal-usr-1",
+        "key": "AMP-102",
+        "title": "Complete code review & technical documentation for Core Platform",
+        "description": "Dedicated task in Arjun Mehta's personal board.",
+        "type": "TASK",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-1",
+        "storyPoints": 3,
+        "originalEstimateHours": 6,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 6,
+        "labels": [
+          "documentation",
+          "review"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-personal-usr-1-3",
+        "projectId": "prj-personal-usr-1",
+        "key": "AMP-103",
+        "title": "Environment setup & workflow automation for Arjun Mehta",
+        "description": "Completed personal onboarding and local environment verification.",
+        "type": "TASK",
+        "status": "DONE",
+        "priority": "LOW",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-1",
+        "storyPoints": 2,
+        "originalEstimateHours": 4,
+        "timeSpentHours": 4,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "setup"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-08",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 3
+      },
+      {
+        "id": "iss-personal-usr-2-1",
+        "projectId": "prj-personal-usr-2",
+        "key": "PSP-101",
+        "title": "Set up personal sprint goals and quarterly OKRs for Priya Sharma",
+        "description": "Personal workspace task for Priya Sharma (Product Experience). Track individual priorities, architecture notes, and deliverables.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-2",
+        "reporterId": "usr-2",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-2",
+        "storyPoints": 5,
+        "originalEstimateHours": 10,
+        "timeSpentHours": 3,
+        "remainingEstimateHours": 7,
+        "labels": [
+          "personal-space",
+          "okr"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-14",
+        "subtasks": [
+          {
+            "id": "sub-pers-usr-2-1",
+            "key": "PSP-101-1",
+            "title": "Review personal backlog items",
+            "completed": true,
+            "assigneeId": "usr-2"
+          },
+          {
+            "id": "sub-pers-usr-2-2",
+            "key": "PSP-101-2",
+            "title": "Finalize weekly execution schedule",
+            "completed": false,
+            "assigneeId": "usr-2"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-2"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-personal-usr-2-2",
+        "projectId": "prj-personal-usr-2",
+        "key": "PSP-102",
+        "title": "Complete code review & technical documentation for Product Experience",
+        "description": "Dedicated task in Priya Sharma's personal board.",
+        "type": "TASK",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-2",
+        "reporterId": "usr-2",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-2",
+        "storyPoints": 3,
+        "originalEstimateHours": 6,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 6,
+        "labels": [
+          "documentation",
+          "review"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-2"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-personal-usr-2-3",
+        "projectId": "prj-personal-usr-2",
+        "key": "PSP-103",
+        "title": "Environment setup & workflow automation for Priya Sharma",
+        "description": "Completed personal onboarding and local environment verification.",
+        "type": "TASK",
+        "status": "DONE",
+        "priority": "LOW",
+        "assigneeId": "usr-2",
+        "reporterId": "usr-2",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-2",
+        "storyPoints": 2,
+        "originalEstimateHours": 4,
+        "timeSpentHours": 4,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "setup"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-08",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-2"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 3
+      },
+      {
+        "id": "iss-personal-usr-3-1",
+        "projectId": "prj-personal-usr-3",
+        "key": "RVP-101",
+        "title": "Set up personal sprint goals and quarterly OKRs for Rohan Verma",
+        "description": "Personal workspace task for Rohan Verma (Distributed Systems). Track individual priorities, architecture notes, and deliverables.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-3",
+        "reporterId": "usr-3",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-3",
+        "storyPoints": 5,
+        "originalEstimateHours": 10,
+        "timeSpentHours": 3,
+        "remainingEstimateHours": 7,
+        "labels": [
+          "personal-space",
+          "okr"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-14",
+        "subtasks": [
+          {
+            "id": "sub-pers-usr-3-1",
+            "key": "RVP-101-1",
+            "title": "Review personal backlog items",
+            "completed": true,
+            "assigneeId": "usr-3"
+          },
+          {
+            "id": "sub-pers-usr-3-2",
+            "key": "RVP-101-2",
+            "title": "Finalize weekly execution schedule",
+            "completed": false,
+            "assigneeId": "usr-3"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-3"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-personal-usr-3-2",
+        "projectId": "prj-personal-usr-3",
+        "key": "RVP-102",
+        "title": "Complete code review & technical documentation for Distributed Systems",
+        "description": "Dedicated task in Rohan Verma's personal board.",
+        "type": "TASK",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-3",
+        "reporterId": "usr-3",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-3",
+        "storyPoints": 3,
+        "originalEstimateHours": 6,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 6,
+        "labels": [
+          "documentation",
+          "review"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-3"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-personal-usr-3-3",
+        "projectId": "prj-personal-usr-3",
+        "key": "RVP-103",
+        "title": "Environment setup & workflow automation for Rohan Verma",
+        "description": "Completed personal onboarding and local environment verification.",
+        "type": "TASK",
+        "status": "DONE",
+        "priority": "LOW",
+        "assigneeId": "usr-3",
+        "reporterId": "usr-3",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-3",
+        "storyPoints": 2,
+        "originalEstimateHours": 4,
+        "timeSpentHours": 4,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "setup"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-08",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-3"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 3
+      },
+      {
+        "id": "iss-personal-usr-4-1",
+        "projectId": "prj-personal-usr-4",
+        "key": "ANP-101",
+        "title": "Set up personal sprint goals and quarterly OKRs for Ananya Nair",
+        "description": "Personal workspace task for Ananya Nair (Quality Engineering). Track individual priorities, architecture notes, and deliverables.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-4",
+        "reporterId": "usr-4",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-4",
+        "storyPoints": 5,
+        "originalEstimateHours": 10,
+        "timeSpentHours": 3,
+        "remainingEstimateHours": 7,
+        "labels": [
+          "personal-space",
+          "okr"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-14",
+        "subtasks": [
+          {
+            "id": "sub-pers-usr-4-1",
+            "key": "ANP-101-1",
+            "title": "Review personal backlog items",
+            "completed": true,
+            "assigneeId": "usr-4"
+          },
+          {
+            "id": "sub-pers-usr-4-2",
+            "key": "ANP-101-2",
+            "title": "Finalize weekly execution schedule",
+            "completed": false,
+            "assigneeId": "usr-4"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-personal-usr-4-2",
+        "projectId": "prj-personal-usr-4",
+        "key": "ANP-102",
+        "title": "Complete code review & technical documentation for Quality Engineering",
+        "description": "Dedicated task in Ananya Nair's personal board.",
+        "type": "TASK",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-4",
+        "reporterId": "usr-4",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-4",
+        "storyPoints": 3,
+        "originalEstimateHours": 6,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 6,
+        "labels": [
+          "documentation",
+          "review"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-personal-usr-4-3",
+        "projectId": "prj-personal-usr-4",
+        "key": "ANP-103",
+        "title": "Environment setup & workflow automation for Ananya Nair",
+        "description": "Completed personal onboarding and local environment verification.",
+        "type": "TASK",
+        "status": "DONE",
+        "priority": "LOW",
+        "assigneeId": "usr-4",
+        "reporterId": "usr-4",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-4",
+        "storyPoints": 2,
+        "originalEstimateHours": 4,
+        "timeSpentHours": 4,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "setup"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-08",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-4"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 3
+      },
+      {
+        "id": "iss-personal-usr-5-1",
+        "projectId": "prj-personal-usr-5",
+        "key": "VDP-101",
+        "title": "Set up personal sprint goals and quarterly OKRs for Vikram Desai",
+        "description": "Personal workspace task for Vikram Desai (Product Strategy). Track individual priorities, architecture notes, and deliverables.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-5",
+        "reporterId": "usr-5",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-5",
+        "storyPoints": 5,
+        "originalEstimateHours": 10,
+        "timeSpentHours": 3,
+        "remainingEstimateHours": 7,
+        "labels": [
+          "personal-space",
+          "okr"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-14",
+        "subtasks": [
+          {
+            "id": "sub-pers-usr-5-1",
+            "key": "VDP-101-1",
+            "title": "Review personal backlog items",
+            "completed": true,
+            "assigneeId": "usr-5"
+          },
+          {
+            "id": "sub-pers-usr-5-2",
+            "key": "VDP-101-2",
+            "title": "Finalize weekly execution schedule",
+            "completed": false,
+            "assigneeId": "usr-5"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-5"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-personal-usr-5-2",
+        "projectId": "prj-personal-usr-5",
+        "key": "VDP-102",
+        "title": "Complete code review & technical documentation for Product Strategy",
+        "description": "Dedicated task in Vikram Desai's personal board.",
+        "type": "TASK",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-5",
+        "reporterId": "usr-5",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-5",
+        "storyPoints": 3,
+        "originalEstimateHours": 6,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 6,
+        "labels": [
+          "documentation",
+          "review"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-5"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-personal-usr-5-3",
+        "projectId": "prj-personal-usr-5",
+        "key": "VDP-103",
+        "title": "Environment setup & workflow automation for Vikram Desai",
+        "description": "Completed personal onboarding and local environment verification.",
+        "type": "TASK",
+        "status": "DONE",
+        "priority": "LOW",
+        "assigneeId": "usr-5",
+        "reporterId": "usr-5",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-5",
+        "storyPoints": 2,
+        "originalEstimateHours": 4,
+        "timeSpentHours": 4,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "setup"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-08",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-5"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 3
+      },
+      {
+        "id": "iss-personal-usr-6-1",
+        "projectId": "prj-personal-usr-6",
+        "key": "SMP-101",
+        "title": "Set up personal sprint goals and quarterly OKRs for Suman Manna",
+        "description": "Personal workspace task for Suman Manna (Quality Engineering). Track individual priorities, architecture notes, and deliverables.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-6",
+        "reporterId": "usr-6",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-6",
+        "storyPoints": 5,
+        "originalEstimateHours": 10,
+        "timeSpentHours": 3,
+        "remainingEstimateHours": 7,
+        "labels": [
+          "personal-space",
+          "okr"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-14",
+        "subtasks": [
+          {
+            "id": "sub-pers-usr-6-1",
+            "key": "SMP-101-1",
+            "title": "Review personal backlog items",
+            "completed": true,
+            "assigneeId": "usr-6"
+          },
+          {
+            "id": "sub-pers-usr-6-2",
+            "key": "SMP-101-2",
+            "title": "Finalize weekly execution schedule",
+            "completed": false,
+            "assigneeId": "usr-6"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-6"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-personal-usr-6-2",
+        "projectId": "prj-personal-usr-6",
+        "key": "SMP-102",
+        "title": "Complete code review & technical documentation for Quality Engineering",
+        "description": "Dedicated task in Suman Manna's personal board.",
+        "type": "TASK",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-6",
+        "reporterId": "usr-6",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-6",
+        "storyPoints": 3,
+        "originalEstimateHours": 6,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 6,
+        "labels": [
+          "documentation",
+          "review"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-6"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-personal-usr-6-3",
+        "projectId": "prj-personal-usr-6",
+        "key": "SMP-103",
+        "title": "Environment setup & workflow automation for Suman Manna",
+        "description": "Completed personal onboarding and local environment verification.",
+        "type": "TASK",
+        "status": "DONE",
+        "priority": "LOW",
+        "assigneeId": "usr-6",
+        "reporterId": "usr-6",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-6",
+        "storyPoints": 2,
+        "originalEstimateHours": 4,
+        "timeSpentHours": 4,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "setup"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-08",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-6"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 3
+      },
+      {
+        "id": "iss-personal-usr-7-1",
+        "projectId": "prj-personal-usr-7",
+        "key": "YKP-101",
+        "title": "Set up personal sprint goals and quarterly OKRs for Yash Kumar",
+        "description": "Personal workspace task for Yash Kumar (Core Platform). Track individual priorities, architecture notes, and deliverables.",
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "HIGH",
+        "assigneeId": "usr-7",
+        "reporterId": "usr-7",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-7",
+        "storyPoints": 5,
+        "originalEstimateHours": 10,
+        "timeSpentHours": 3,
+        "remainingEstimateHours": 7,
+        "labels": [
+          "personal-space",
+          "okr"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-14",
+        "subtasks": [
+          {
+            "id": "sub-pers-usr-7-1",
+            "key": "YKP-101-1",
+            "title": "Review personal backlog items",
+            "completed": true,
+            "assigneeId": "usr-7"
+          },
+          {
+            "id": "sub-pers-usr-7-2",
+            "key": "YKP-101-2",
+            "title": "Finalize weekly execution schedule",
+            "completed": false,
+            "assigneeId": "usr-7"
+          }
+        ],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-7"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 1
+      },
+      {
+        "id": "iss-personal-usr-7-2",
+        "projectId": "prj-personal-usr-7",
+        "key": "YKP-102",
+        "title": "Complete code review & technical documentation for Core Platform",
+        "description": "Dedicated task in Yash Kumar's personal board.",
+        "type": "TASK",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-7",
+        "reporterId": "usr-7",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-7",
+        "storyPoints": 3,
+        "originalEstimateHours": 6,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 6,
+        "labels": [
+          "documentation",
+          "review"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-07",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-7"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 2
+      },
+      {
+        "id": "iss-personal-usr-7-3",
+        "projectId": "prj-personal-usr-7",
+        "key": "YKP-103",
+        "title": "Environment setup & workflow automation for Yash Kumar",
+        "description": "Completed personal onboarding and local environment verification.",
+        "type": "TASK",
+        "status": "DONE",
+        "priority": "LOW",
+        "assigneeId": "usr-7",
+        "reporterId": "usr-7",
+        "epicId": null,
+        "sprintId": "spr-personal-usr-7",
+        "storyPoints": 2,
+        "originalEstimateHours": 4,
+        "timeSpentHours": 4,
+        "remainingEstimateHours": 0,
+        "labels": [
+          "setup"
+        ],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-05",
+        "dueDate": "2026-10-08",
+        "subtasks": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-7"
+        ],
+        "createdAt": "2026-10-06T09:00:00.000Z",
+        "updatedAt": "2026-10-06T09:00:00.000Z",
+        "order": 3
+      }
+    ]
+  }
+}

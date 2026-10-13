@@ -15,6 +15,8 @@ import {
   IssueStatus,
   IssueType,
 } from '../types/arij.js';
+import { extractTextFromPdfArrayBuffer } from '../utils/pdfTextExtractor.js';
+import { parseStructuredStoryFromExtractedText } from '../utils/storyTextParser.js';
 
 // ============================================================================
 // 1. CREATE ISSUE MODAL
@@ -79,8 +81,10 @@ export const CreateIssueModal = ({
   const [pdfAutoFillBanner, setPdfAutoFillBanner] = useState(null);
   const [extractedSubtasks, setExtractedSubtasks] = useState([]);
   const [uploadedAttachments, setUploadedAttachments] = useState([]);
+  const [extractedStructuredFields, setExtractedStructuredFields] =
+    useState(null);
 
-  const applyExtractedStoryFields = (data, fileName, fileSizeStr = '240 KB') => {
+  const applyExtractedStoryFields = (data, fileName, fileSizeStr = '120 KB') => {
     if (data.title) setTitle(data.title);
     if (data.description) setDescription(data.description);
     if (data.type && IssueType[data.type]) {
@@ -88,24 +92,68 @@ export const CreateIssueModal = ({
     } else {
       setType(IssueType.STORY);
     }
+    if (data.status && IssueStatus[data.status]) {
+      setStatus(IssueStatus[data.status]);
+    }
     if (data.priority && IssuePriority[data.priority]) {
       setPriority(IssuePriority[data.priority]);
     }
-    if (data.storyPoints !== undefined) {
-      setStoryPoints(Number(data.storyPoints) || 5);
+    if (data.storyPoints !== undefined && data.storyPoints !== null) {
+      setStoryPoints(Number(data.storyPoints) || 0);
+    } else {
+      setStoryPoints(0);
     }
-    if (data.originalEstimateHours !== undefined) {
-      setOriginalEstimateHours(Number(data.originalEstimateHours) || 12);
+    if (
+      data.originalEstimateHours !== undefined &&
+      data.originalEstimateHours !== null
+    ) {
+      setOriginalEstimateHours(Number(data.originalEstimateHours) || 0);
     }
-    if (data.dueDate) {
-      setDueDate(data.dueDate);
+    if (data.dueDate !== undefined) {
+      setDueDate(data.dueDate || '');
     }
-    if (Array.isArray(data.labels) && data.labels.length > 0) {
+    if (Array.isArray(data.labels)) {
       setLabelsRaw(data.labels.join(', '));
     }
-    if (Array.isArray(data.subtasks)) {
-      setExtractedSubtasks(data.subtasks);
-    }
+    const nextSubtasks =
+      Array.isArray(data.subtasks) && data.subtasks.length > 0
+        ? data.subtasks
+        : Array.isArray(data.testCases)
+        ? data.testCases.map((tc, idx) => ({
+            key: data.issueKey ? `${data.issueKey}-${idx + 1}` : undefined,
+            title: tc,
+            completed: false,
+          }))
+        : [];
+    setExtractedSubtasks(nextSubtasks);
+    setExtractedStructuredFields({
+      customIssueKey: data.issueKey || undefined,
+      preserveCustomKey: !!data.issueKey,
+      projectName: data.projectName || '',
+      projectKey: data.projectKey || '',
+      parentKey: data.parentKey || '',
+      parentTitle: data.parentTitle || '',
+      parentStatus: data.parentStatus || 'IN_PROGRESS',
+      userStory: data.userStory || '',
+      scopeDescription: data.scopeDescription || '',
+      acceptanceCriteria: Array.isArray(data.acceptanceCriteria)
+        ? data.acceptanceCriteria
+        : [],
+      testCases: Array.isArray(data.testCases) ? data.testCases : [],
+      definitionOfDone: Array.isArray(data.definitionOfDone)
+        ? data.definitionOfDone
+        : [],
+      assigneeName: data.assigneeName || '',
+      reporterName: data.reporterName || data.assigneeName || '',
+      componentName: data.componentName || '',
+      explicitNoSprint:
+        !data.sprintName || /^none$/i.test(String(data.sprintName).trim()),
+      reviewers: Array.isArray(data.reviewers) ? data.reviewers : [],
+      approvers: Array.isArray(data.approvers) ? data.approvers : [],
+      createdAtText: data.createdAtText || '',
+      updatedAtText: data.updatedAtText || '',
+      sourceUrl: data.sourceUrl || '',
+    });
     setUploadedPdfName(fileName);
     setUploadedAttachments([
       {
@@ -116,11 +164,11 @@ export const CreateIssueModal = ({
       },
     ]);
     setPdfAutoFillBanner(
-      `Auto-filled Title, Description, Story Points, Priority, Labels${
-        Array.isArray(data.subtasks) && data.subtasks.length > 0
-          ? ` & ${data.subtasks.length} Subtasks`
-          : ''
-      } from "${fileName}"!`
+      `Dynamically extracted Story Title, Description, ${
+        Array.isArray(data.acceptanceCriteria)
+          ? data.acceptanceCriteria.length
+          : 0
+      } Scenarios & ${nextSubtasks.length} Subtasks from "${fileName}"!`
     );
   };
 
@@ -133,6 +181,39 @@ export const CreateIssueModal = ({
     const activeProj =
       projects.find((p) => p.id === projectId) || projects[0];
     const fileSizeStr = `${Math.max(1, Math.round(file.size / 1024))} KB`;
+
+    let clientPdfText = '';
+    let clientLeftText = '';
+    let clientRightSidebar = '';
+    let clientMetadataTitle = '';
+
+    try {
+      const isPdf =
+        file.type === 'application/pdf' ||
+        file.name.toLowerCase().endsWith('.pdf');
+      if (isPdf) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfResult = await extractTextFromPdfArrayBuffer(arrayBuffer);
+        clientPdfText = pdfResult.fullText || '';
+        clientLeftText = pdfResult.leftText || '';
+        clientRightSidebar = pdfResult.rightSidebarText || '';
+        clientMetadataTitle = pdfResult.metadataTitle || '';
+      } else {
+        clientPdfText = await file.text();
+        clientLeftText = clientPdfText;
+      }
+    } catch {
+      // Fallback to server stream decoding
+    }
+
+    const localParsed = parseStructuredStoryFromExtractedText({
+      rawText: clientPdfText,
+      leftText: clientLeftText,
+      rightSidebarText: clientRightSidebar,
+      metadataTitle: clientMetadataTitle,
+      fileName: file.name,
+      defaultProjectKey: activeProj?.key || 'KP',
+    });
 
     try {
       const base64Data = await new Promise((resolve, reject) => {
@@ -153,54 +234,18 @@ export const CreateIssueModal = ({
           fileName: file.name,
           mimeType: file.type || 'application/pdf',
           fileDataBase64: base64Data,
-          projectKey: activeProj?.key || 'KAW',
+          extractedTextHint: clientPdfText,
+          leftColumnText: clientLeftText,
+          rightSidebarText: clientRightSidebar,
+          metadataTitle: clientMetadataTitle,
+          projectKey: activeProj?.key || 'KP',
         }),
       });
+      if (!res.ok) throw new Error('Server extraction error');
       const data = await res.json();
       applyExtractedStoryFields(data, file.name, fileSizeStr);
     } catch {
-      const cleanName = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
-      applyExtractedStoryFields(
-        {
-          title: `User Story: ${cleanName}`,
-          description: `### User Story Specification (${file.name})\nAutomatically extracted requirements from uploaded PDF \`${file.name}\`.\n\n### Acceptance Criteria\n- Implement end-to-end story workflow and UI/API validation\n- Add automated unit and integration tests`,
-          type: 'STORY',
-          priority: 'HIGH',
-          storyPoints: 5,
-          originalEstimateHours: 12,
-          dueDate: '2026-10-22',
-          labels: ['pdf-story', 'auto-filled'],
-          subtasks: [
-            { title: `Implement core story logic from ${file.name}`, completed: false },
-            { title: 'Verify acceptance criteria and QA test cases', completed: false },
-          ],
-        },
-        file.name,
-        fileSizeStr
-      );
-    } finally {
-      setIsParsingPdf(false);
-    }
-  };
-
-  const handleLoadSampleStoryPdf = async () => {
-    setIsParsingPdf(true);
-    const activeProj =
-      projects.find((p) => p.id === projectId) || projects[0];
-    try {
-      const res = await fetch('/api/arij/extract-story-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: 'arij-sso-rbac-user-story.pdf',
-          mimeType: 'application/pdf',
-          extractedTextHint:
-            'Title: Implement Role-Based Access Control (RBAC) & SAML 2.0 Single Sign-On Story\nDescription: As an Enterprise Organization Admin, I want granular RBAC permission schemes and SAML 2.0 SSO enforced across all Arij projects so that only authorized engineers can transition issues to Production Done.\nAcceptance Criteria:\n1. Support SAML 2.0 identity provider metadata upload\n2. Enforce project-level and workflow transition permissions\n3. Log all permission changes in the immutable Security Audit Log\nPriority: HIGH\nStory Points: 8',
-          projectKey: activeProj?.key || 'KAW',
-        }),
-      });
-      const data = await res.json();
-      applyExtractedStoryFields(data, 'arij-sso-rbac-user-story.pdf', '318 KB');
+      applyExtractedStoryFields(localParsed, file.name, fileSizeStr);
     } finally {
       setIsParsingPdf(false);
     }
@@ -218,7 +263,9 @@ export const CreateIssueModal = ({
       priority,
       assigneeId: assigneeId || null,
       epicId: epicId || null,
-      sprintId: sprintId || null,
+      sprintId: extractedStructuredFields?.explicitNoSprint
+        ? null
+        : sprintId || null,
       storyPoints: Number(storyPoints) || 0,
       originalEstimateHours: Number(originalEstimateHours) || 0,
       componentId: componentId || null,
@@ -227,9 +274,10 @@ export const CreateIssueModal = ({
       labels: labelsRaw
         .split(',')
         .map((s) => s.trim())
-        .filter(Boolean),
+        .filter((s) => s && !/^none$/i.test(s)),
       subtasks: extractedSubtasks,
       attachments: uploadedAttachments,
+      ...(extractedStructuredFields || {}),
     });
     onClose();
   };
@@ -293,16 +341,6 @@ export const CreateIssueModal = ({
                     className="hidden"
                   />
                 </label>
-
-                <button
-                  type="button"
-                  onClick={handleLoadSampleStoryPdf}
-                  disabled={isParsingPdf}
-                  className="px-2.5 py-1.5 text-xs font-semibold bg-white hover:bg-slate-100 text-blue-700 border border-blue-200 rounded-md flex items-center gap-1"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Sample PDF
-                </button>
               </div>
             </div>
 

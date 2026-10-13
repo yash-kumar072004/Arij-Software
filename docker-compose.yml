@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: arij-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arij
+      POSTGRES_PASSWORD: arij_secret_password
+      POSTGRES_DB: arij_enterprise
+    ports:
+      - '5432:5432'
+    volumes:
+      - arij_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U arij -d arij_enterprise']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  arij-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arij-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://arij:arij_secret_password@postgres:5432/arij_enterprise?schema=public
+      JWT_ACCESS_SECRET: arij_jwt_access_secret_key_2026
+      JWT_REFRESH_SECRET: arij_jwt_refresh_secret_key_2026
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./workspace-db.json:/app/workspace-db.json
+
+volumes:
+  arij_pgdata:

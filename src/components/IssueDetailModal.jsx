@@ -4,6 +4,7 @@ import {
   CheckSquare,
   Clock,
   Copy,
+  Download,
   Eye,
   GitBranch,
   History,
@@ -29,6 +30,91 @@ import {
   TYPE_CONFIG,
   UserAvatar,
 } from './ArijPrimitives.jsx';
+import { parseStructuredStoryFromExtractedText } from '../utils/storyTextParser.js';
+
+const renderInlineMarkdown = (line) => {
+  const parts = String(line || '').split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={idx} className="font-semibold text-slate-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return (
+        <code
+          key={idx}
+          className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[11px] text-blue-700"
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return part;
+  });
+};
+
+const renderMarkdownDescription = (text) => {
+  if (!text || !String(text).trim()) {
+    return (
+      <p className="text-xs text-slate-400 italic">
+        No description provided. Click &ldquo;Edit Description&rdquo; to add Markdown notes or specifications.
+      </p>
+    );
+  }
+  const lines = String(text).split('\n');
+  return (
+    <div className="space-y-1.5 text-xs text-slate-700 leading-relaxed">
+      {lines.map((rawLine, idx) => {
+        const line = rawLine.trim();
+        if (!line) return <div key={idx} className="h-1.5" />;
+        if (line.startsWith('### ')) {
+          return (
+            <h4 key={idx} className="text-xs font-bold text-slate-900 pt-1">
+              {renderInlineMarkdown(line.slice(4))}
+            </h4>
+          );
+        }
+        if (line.startsWith('## ')) {
+          return (
+            <h3 key={idx} className="text-sm font-bold text-slate-900 pt-1.5">
+              {renderInlineMarkdown(line.slice(3))}
+            </h3>
+          );
+        }
+        if (line.startsWith('# ')) {
+          return (
+            <h2 key={idx} className="text-base font-bold text-slate-900 pt-2">
+              {renderInlineMarkdown(line.slice(2))}
+            </h2>
+          );
+        }
+        if (/^[-*•]\s+/.test(line)) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-2">
+              <span className="text-slate-400 select-none">•</span>
+              <span>{renderInlineMarkdown(line.replace(/^[-*•]\s+/, ''))}</span>
+            </div>
+          );
+        }
+        if (/^\d+[.)]\s+/.test(line)) {
+          const numMatch = line.match(/^(\d+[.)])\s+(.*)$/);
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-2">
+              <span className="font-mono text-slate-500 font-semibold select-none">
+                {numMatch ? numMatch[1] : '1.'}
+              </span>
+              <span>{renderInlineMarkdown(numMatch ? numMatch[2] : line)}</span>
+            </div>
+          );
+        }
+        return <p key={idx}>{renderInlineMarkdown(rawLine)}</p>;
+      })}
+    </div>
+  );
+};
 
 export const IssueDetailModal = ({
   issue,
@@ -68,9 +154,23 @@ export const IssueDetailModal = ({
   const [logHours, setLogHours] = useState('');
   const [logComment, setLogComment] = useState('');
 
-  // Attachments state (Section 17)
+  // Attachments state (Phase 3.3: file upload, 10MB size limit, MIME validation)
   const [newAttachmentName, setNewAttachmentName] = useState('');
   const [showAddAttachment, setShowAddAttachment] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
+  const [showWatchersMenu, setShowWatchersMenu] = useState(false);
+
+  const ALLOWED_ATTACHMENT_TYPES = [
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'text/plain',
+    'text/csv',
+    'application/json',
+    'application/zip',
+  ];
+  const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
 
   // Emoji reactions per comment
   const [commentReactions, setCommentReactions] = useState({});
@@ -79,25 +179,131 @@ export const IssueDetailModal = ({
     users[0]?.id || 'usr-1'
   );
 
-  const handleToggleWatch = () => {
-    const uid = users[0]?.id || 'usr-1';
+  const handleToggleWatch = (targetUserId) => {
+    const uid =
+      typeof targetUserId === 'string' ? targetUserId : users[0]?.id || 'usr-1';
     const current = issue.watcherIds || [];
     const next = current.includes(uid)
       ? current.filter((id) => id !== uid)
       : [...current, uid];
     onUpdateIssue(issue.id, { watcherIds: next });
+    fetch(`/api/issues/${encodeURIComponent(issue.id)}/watchers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid }),
+    }).catch(() => {});
+  };
+
+  const handleFileUploadChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAttachmentError('');
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setAttachmentError(
+        `File "${file.name}" exceeds the 10 MB size limit (${(
+          file.size /
+          (1024 * 1024)
+        ).toFixed(2)} MB).`
+      );
+      e.target.value = '';
+      return;
+    }
+
+    const inferredMime =
+      file.type ||
+      (file.name.endsWith('.pdf')
+        ? 'application/pdf'
+        : file.name.endsWith('.png')
+        ? 'image/png'
+        : file.name.endsWith('.jpg') || file.name.endsWith('.jpeg')
+        ? 'image/jpeg'
+        : file.name.endsWith('.json')
+        ? 'application/json'
+        : file.name.endsWith('.csv')
+        ? 'text/csv'
+        : file.name.endsWith('.zip')
+        ? 'application/zip'
+        : 'text/plain');
+
+    if (!ALLOWED_ATTACHMENT_TYPES.includes(inferredMime)) {
+      setAttachmentError(
+        `Unsupported MIME type "${inferredMime}". Allowed: PDF, PNG, JPEG, WEBP, TXT, CSV, JSON, ZIP.`
+      );
+      e.target.value = '';
+      return;
+    }
+
+    const sizeLabel =
+      file.size >= 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+
+    const newAtt = {
+      id: `att-${Date.now()}`,
+      name: file.name,
+      mimeType: inferredMime,
+      sizeBytes: file.size,
+      size: sizeLabel,
+      uploadedAt: new Date().toISOString().slice(0, 10),
+    };
+
+    const current = issue.attachments || [];
+    onUpdateIssue(issue.id, {
+      attachments: [...current, newAtt],
+    });
+
+    fetch(`/api/issues/${encodeURIComponent(issue.id)}/attachments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: inferredMime,
+        sizeBytes: Math.max(1, file.size),
+      }),
+    }).catch(() => {});
+
+    e.target.value = '';
+    setShowAddAttachment(false);
   };
 
   const handleAddAttachmentSubmit = (e) => {
     e.preventDefault();
-    if (!newAttachmentName.trim()) return;
+    setAttachmentError('');
+    const cleanName = newAttachmentName.trim();
+    if (!cleanName) return;
+
+    const ext = cleanName.split('.').pop()?.toLowerCase() || '';
+    const mimeMap = {
+      pdf: 'application/pdf',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      webp: 'image/webp',
+      txt: 'text/plain',
+      log: 'text/plain',
+      md: 'text/plain',
+      csv: 'text/csv',
+      json: 'application/json',
+      zip: 'application/zip',
+    };
+    const mimeType = mimeMap[ext];
+    if (!mimeType) {
+      setAttachmentError(
+        'Invalid file extension. Allowed extensions: .pdf, .png, .jpg, .webp, .txt, .csv, .json, .zip (max 10 MB).'
+      );
+      return;
+    }
+
     const current = issue.attachments || [];
     onUpdateIssue(issue.id, {
       attachments: [
         ...current,
         {
           id: `att-${Date.now()}`,
-          name: newAttachmentName.trim(),
+          name: cleanName,
+          mimeType,
+          sizeBytes: 430080,
           size: '420 KB',
           uploadedAt: new Date().toISOString().slice(0, 10),
         },
@@ -169,12 +375,32 @@ export const IssueDetailModal = ({
   const handleAddLinkSubmit = (e) => {
     e.preventDefault();
     if (!linkTargetId) return;
+    const targetIssue = allIssues.find(
+      (i) => i.id === linkTargetId || i.key === linkTargetId
+    );
     const newLink = {
       id: `lnk-${Date.now()}`,
       type: linkType,
-      targetIssueId: linkTargetId,
+      targetIssueId: targetIssue ? targetIssue.id : linkTargetId,
+      targetIssueKey: targetIssue ? targetIssue.key : linkTargetId,
     };
     onUpdateIssue(issue.id, { links: [...issue.links, newLink] });
+    if (targetIssue) {
+      fetch(`/api/issues/${encodeURIComponent(issue.id)}/links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          linkType:
+            linkType === 'BLOCKS' ||
+            linkType === 'IS_BLOCKED_BY' ||
+            linkType === 'RELATES_TO' ||
+            linkType === 'DUPLICATES'
+              ? linkType
+              : 'RELATES_TO',
+          targetIssueKey: targetIssue.key,
+        }),
+      }).catch(() => {});
+    }
     setLinkTargetId('');
     setShowAddLink(false);
   };
@@ -232,6 +458,56 @@ export const IssueDetailModal = ({
     Math.round((issue.timeSpentHours / totalEstimate) * 100)
   );
 
+  // Dynamically parse structured sections only if present on the issue or in its description (zero hardcoded templates)
+  const parsedFromDescription = useMemo(() => {
+    if (
+      issue.description &&
+      /(?:User\s+Story|Scope\s*\/?\s*Description|Acceptance\s+Criteria|Scenario\s+\d+\s*:|Test\s+Cases|Definition\s+of\s+Done)/i.test(
+        issue.description
+      )
+    ) {
+      return parseStructuredStoryFromExtractedText(
+        issue.description,
+        issue.title || ''
+      );
+    }
+    return null;
+  }, [issue.description, issue.title]);
+
+  const structuredUserStory =
+    issue.userStory && String(issue.userStory).trim()
+      ? String(issue.userStory).trim()
+      : parsedFromDescription?.userStory || '';
+
+  const structuredScopeDescription =
+    issue.scopeDescription && String(issue.scopeDescription).trim()
+      ? String(issue.scopeDescription).trim()
+      : parsedFromDescription?.scopeDescription || '';
+
+  const structuredAcceptanceCriteria =
+    Array.isArray(issue.acceptanceCriteria) &&
+    issue.acceptanceCriteria.length > 0
+      ? issue.acceptanceCriteria
+      : parsedFromDescription?.acceptanceCriteria || [];
+
+  const structuredTestCases =
+    Array.isArray(issue.testCases) && issue.testCases.length > 0
+      ? issue.testCases
+      : parsedFromDescription?.testCases || [];
+
+  const structuredDefinitionOfDone =
+    Array.isArray(issue.definitionOfDone) && issue.definitionOfDone.length > 0
+      ? issue.definitionOfDone
+      : parsedFromDescription?.definitionOfDone || [];
+
+  const hasStructuredStoryFields = Boolean(
+    structuredUserStory ||
+      structuredScopeDescription ||
+      structuredAcceptanceCriteria.length > 0 ||
+      structuredTestCases.length > 0 ||
+      structuredDefinitionOfDone.length > 0
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
@@ -242,8 +518,30 @@ export const IssueDetailModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Modal Header Bar */}
-        <div className="px-6 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-          <div className="flex items-center gap-2.5">
+        <div className="px-6 py-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-semibold text-slate-600">
+              {issue.projectName || 'Kawach Product'}
+            </span>
+            {(issue.parentKey || issue.epicId) && (
+              <>
+                <span className="text-slate-400">/</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-mono font-semibold text-[11px]">
+                  {issue.parentKey ||
+                    epics.find((ep) => ep.id === issue.epicId)?.key ||
+                    'KP-5831'}
+                  <span className="font-sans font-medium text-purple-900">
+                    {issue.parentTitle ||
+                      epics.find((ep) => ep.id === issue.epicId)?.title ||
+                      'Automation Test Cases'}
+                  </span>
+                  <span className="px-1.5 py-0.2 bg-blue-600 text-white rounded text-[9px] uppercase">
+                    {(issue.parentStatus || 'IN PROGRESS').replace(/_/g, ' ')}
+                  </span>
+                </span>
+              </>
+            )}
+            <span className="text-slate-400">/</span>
             <select
               value={issue.type}
               onChange={(e) =>
@@ -271,20 +569,126 @@ export const IssueDetailModal = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
+            <div className="relative">
+              <div className="inline-flex items-center rounded border border-slate-200 bg-white overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => handleToggleWatch()}
+                  className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                    isWatching
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                  title="Watch / Unwatch issue"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  {isWatching ? 'Watching' : 'Watch'} (
+                  {(issue.watcherIds || []).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowWatchersMenu((v) => !v)}
+                  className="px-1.5 py-1.5 text-[10px] text-slate-500 hover:bg-slate-100 border-l border-slate-200"
+                  title="Manage Issue Watchers"
+                >
+                  ▾
+                </button>
+              </div>
+
+              {showWatchersMenu && (
+                <div className="absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-lg shadow-xl z-30 p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between font-bold text-slate-900 border-b border-slate-100 pb-1.5">
+                    <span>Issue Watchers ({(issue.watcherIds || []).length})</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowWatchersMenu(false)}
+                      className="text-slate-400 hover:text-slate-700"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="max-h-44 overflow-y-auto space-y-1">
+                    {users.map((u) => {
+                      const watching = (issue.watcherIds || []).includes(u.id);
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => handleToggleWatch(u.id)}
+                          className="w-full px-2 py-1.5 rounded hover:bg-slate-50 flex items-center justify-between text-left"
+                        >
+                          <UserAvatar user={u} size="xs" showName />
+                          <span
+                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                              watching
+                                ? 'bg-blue-100 text-blue-700 font-bold'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}
+                          >
+                            {watching ? 'Watching' : '+ Watch'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               type="button"
-              onClick={handleToggleWatch}
-              className={`px-2.5 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-colors border ${
-                isWatching
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-              title="Watch / Unwatch issue"
+              onClick={() => {
+                const lines = [
+                  `# [${issue.key}] ${issue.title}`,
+                  ``,
+                  `## Story Title`,
+                  `${issue.storyTitle || issue.title}`,
+                  ``,
+                  `## User Story`,
+                  `${structuredUserStory || issue.description || ''}`,
+                  ``,
+                  `## Scope / Description`,
+                  `${structuredScopeDescription || issue.description || ''}`,
+                  ``,
+                  `## Acceptance Criteria`,
+                  ...(structuredAcceptanceCriteria.length > 0
+                    ? structuredAcceptanceCriteria.flatMap((sc) => [
+                        `### ${sc.scenarioTitle}`,
+                        ...(sc.steps || []).map((st) => `- ${st}`),
+                        ``,
+                      ])
+                    : ['- Verified per story specification']),
+                  `## Test Cases to Automate`,
+                  ...(structuredTestCases.length > 0
+                    ? structuredTestCases.map((tc, idx) => `${idx + 1}. ${tc}`)
+                    : ['1. Verify primary functional flow']),
+                  ``,
+                  `## Definition of Done (DoD)`,
+                  ...(structuredDefinitionOfDone.length > 0
+                    ? structuredDefinitionOfDone.map((d) => `- [x] ${d}`)
+                    : ['- [x] Code reviewed and merged']),
+                  ``,
+                  `## Subtasks (${(issue.subtasks || []).filter((s) => s.completed).length}/${(issue.subtasks || []).length})`,
+                  ...(issue.subtasks || []).map(
+                    (s, idx) =>
+                      `- [${s.completed ? 'x' : ' '}] ${s.key || `${issue.key}-${idx + 1}`}: ${s.title}`
+                  ),
+                ];
+                const blob = new Blob([lines.join('\n')], {
+                  type: 'text/markdown;charset=utf-8;',
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${issue.key}-Story-Spec.md`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded flex items-center gap-1.5 transition-colors"
+              title="Export structured Jira / Kawach Story Specification (.md)"
             >
-              <Eye className="w-3.5 h-3.5" />
-              {isWatching ? 'Watching' : 'Watch'} (
-              {(issue.watcherIds || []).length})
+              <Download className="w-3.5 h-3.5" />
+              Export Spec
             </button>
             <button
               type="button"
@@ -367,19 +771,65 @@ export const IssueDetailModal = ({
               )}
             </div>
 
-            {/* Editable Description */}
-            <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Description
+            {/* Editable Description + Structured Jira Story Sections */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Description
+                </div>
+                {!editingDesc && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDescDraft(issue.description);
+                      setEditingDesc(true);
+                    }}
+                    className="text-xs font-semibold text-blue-600 hover:underline"
+                  >
+                    Edit Description
+                  </button>
+                )}
               </div>
+
               {editingDesc ? (
                 <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 border border-slate-300 rounded-t-md text-[11px] font-mono text-slate-700">
+                    <span className="text-slate-400 font-sans mr-1">Markdown:</span>
+                    <button
+                      type="button"
+                      onClick={() => setDescDraft((d) => `${d}\n## Section Heading\n`)}
+                      className="px-2 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-50"
+                    >
+                      ## Heading
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDescDraft((d) => `${d} **bold** `)}
+                      className="px-2 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-50 font-bold"
+                    >
+                      **Bold**
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDescDraft((d) => `${d} \`code\` `)}
+                      className="px-2 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-50"
+                    >
+                      `Code`
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDescDraft((d) => `${d}\n- Bullet item`)}
+                      className="px-2 py-0.5 bg-white border border-slate-200 rounded hover:bg-slate-50"
+                    >
+                      • List
+                    </button>
+                  </div>
                   <textarea
-                    rows={5}
+                    rows={10}
                     autoFocus
                     value={descDraft}
                     onChange={(e) => setDescDraft(e.target.value)}
-                    className="w-full text-sm text-slate-800 bg-white border border-blue-600 rounded-md p-3 focus:outline-none"
+                    className="w-full text-sm font-mono text-slate-800 bg-white border border-blue-600 rounded-b-md p-3 focus:outline-none"
                   />
                   <div className="flex items-center gap-2">
                     <button
@@ -402,15 +852,115 @@ export const IssueDetailModal = ({
                   </div>
                 </div>
               ) : (
-                <div
-                  onClick={() => {
-                    setDescDraft(issue.description);
-                    setEditingDesc(true);
-                  }}
-                  className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md p-3.5 cursor-pointer min-h-[76px]"
-                  title="Click to edit description"
-                >
-                  {issue.description || 'Click to add technical description...'}
+                <div className="space-y-4 bg-white border border-slate-200 rounded-lg p-4 text-slate-800">
+                  {hasStructuredStoryFields ? (
+                    <>
+                      {/* Story Title */}
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 mb-1">
+                          Story Title
+                        </div>
+                        <div className="text-xs text-slate-700">{issue.title}</div>
+                      </div>
+
+                      {/* User Story */}
+                      {structuredUserStory && (
+                        <div>
+                          <div className="text-xs font-bold text-slate-900 mb-1">
+                            User Story
+                          </div>
+                          <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 border border-slate-200 rounded p-3">
+                            {structuredUserStory}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Scope / Description */}
+                      {structuredScopeDescription && (
+                        <div>
+                          <div className="text-xs font-bold text-slate-900 mb-1">
+                            Scope / Description
+                          </div>
+                          <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                            {structuredScopeDescription}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Acceptance Criteria Scenarios */}
+                      {Array.isArray(structuredAcceptanceCriteria) &&
+                        structuredAcceptanceCriteria.length > 0 && (
+                          <div className="space-y-2.5">
+                            <div className="text-sm font-bold text-slate-900">
+                              Acceptance Criteria
+                            </div>
+                            {structuredAcceptanceCriteria.map((sc, sIdx) => (
+                              <div
+                                key={sIdx}
+                                className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1.5"
+                              >
+                                <div className="text-xs font-bold text-slate-900">
+                                  {sc.scenarioTitle}
+                                </div>
+                                <ul className="list-disc pl-5 space-y-1 text-xs text-slate-700">
+                                  {(sc.steps || []).map((step, stIdx) => {
+                                    const bddMatch = String(step).match(
+                                      /^(Given|When|Then|And|But)\b(.*)$/i
+                                    );
+                                    return (
+                                      <li key={stIdx}>
+                                        {bddMatch ? (
+                                          <>
+                                            <strong className="text-slate-900">
+                                              {bddMatch[1]}
+                                            </strong>
+                                            {bddMatch[2]}
+                                          </>
+                                        ) : (
+                                          step
+                                        )}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                      {/* Test Cases to Automate */}
+                      {Array.isArray(structuredTestCases) &&
+                        structuredTestCases.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="text-sm font-bold text-slate-900">
+                              Test Cases to Automate
+                            </div>
+                            <ol className="list-decimal pl-5 space-y-1 text-xs text-slate-700">
+                              {structuredTestCases.map((tc, tcIdx) => (
+                                <li key={tcIdx}>{tc}</li>
+                              ))}
+                            </ol>
+                          </div>
+                        )}
+
+                      {/* Definition of Done (DoD) */}
+                      {Array.isArray(structuredDefinitionOfDone) &&
+                        structuredDefinitionOfDone.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="text-sm font-bold text-slate-900">
+                              Definition of Done (DoD)
+                            </div>
+                            <ul className="list-disc pl-5 space-y-1 text-xs text-slate-700">
+                              {structuredDefinitionOfDone.map((dod, dIdx) => (
+                                <li key={dIdx}>{dod}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                    </>
+                  ) : (
+                    renderMarkdownDescription(issue.description)
+                  )}
                 </div>
               )}
             </div>
@@ -583,7 +1133,15 @@ export const IssueDetailModal = ({
               {issue.links.length > 0 && (
                 <div className="divide-y divide-slate-200 border border-slate-200 rounded-md">
                   {issue.links.map((lnk) => {
-                    const target = issueMap[lnk.targetIssueId];
+                    const target =
+                      issueMap[lnk.targetIssueId] ||
+                      allIssues.find(
+                        (i) =>
+                          i.key &&
+                          lnk.targetIssueKey &&
+                          i.key.toUpperCase() ===
+                            String(lnk.targetIssueKey).toUpperCase()
+                      );
                     if (!target) return null;
                     const isBlockingWarning =
                       (lnk.type === 'IS_BLOCKED_BY' ||
@@ -629,7 +1187,7 @@ export const IssueDetailModal = ({
               )}
             </div>
 
-            {/* Attachments & Files (Section 17) */}
+            {/* Attachments & Files (Phase 3.3: File upload, 10MB size limit, MIME validation) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -637,7 +1195,10 @@ export const IssueDetailModal = ({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setShowAddAttachment(!showAddAttachment)}
+                  onClick={() => {
+                    setAttachmentError('');
+                    setShowAddAttachment(!showAddAttachment);
+                  }}
                   className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
                 >
                   <Paperclip className="w-3.5 h-3.5" />
@@ -646,24 +1207,48 @@ export const IssueDetailModal = ({
               </div>
 
               {showAddAttachment && (
-                <form
-                  onSubmit={handleAddAttachmentSubmit}
-                  className="flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    value={newAttachmentName}
-                    onChange={(e) => setNewAttachmentName(e.target.value)}
-                    placeholder="e.g. architecture-diagram.png or log-trace.json"
-                    className="flex-1 text-xs bg-white border border-blue-500 rounded px-3 py-1.5"
-                  />
-                  <button
-                    type="submit"
-                    className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded"
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white border border-slate-300 hover:border-blue-500 text-xs font-semibold text-slate-700 shadow-2xs">
+                      <Paperclip className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Upload File from Device (Max 10 MB)</span>
+                      <input
+                        type="file"
+                        onChange={handleFileUploadChange}
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.json,.zip"
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Allowed: PDF, PNG, JPG, WEBP, TXT, CSV, JSON, ZIP
+                    </span>
+                  </div>
+
+                  <form
+                    onSubmit={handleAddAttachmentSubmit}
+                    className="flex items-center gap-2"
                   >
-                    Attach
-                  </button>
-                </form>
+                    <input
+                      type="text"
+                      value={newAttachmentName}
+                      onChange={(e) => setNewAttachmentName(e.target.value)}
+                      placeholder="Or enter file name (e.g. architecture-diagram.png or log-trace.json)"
+                      className="flex-1 text-xs bg-white border border-blue-500 rounded px-3 py-1.5"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded"
+                    >
+                      Attach
+                    </button>
+                  </form>
+
+                  {attachmentError && (
+                    <div className="text-[11px] font-medium text-red-600 bg-red-50 border border-red-200 rounded px-2.5 py-1.5">
+                      {attachmentError}
+                    </div>
+                  )}
+                </div>
               )}
 
               {(issue.attachments || []).length > 0 && (
@@ -673,12 +1258,17 @@ export const IssueDetailModal = ({
                       key={att.id}
                       className="px-3 py-2 bg-white flex items-center justify-between text-xs"
                     >
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-medium text-slate-800">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="font-medium text-slate-800 truncate">
                           {att.name}
                         </span>
-                        <span className="font-mono text-[11px] text-slate-400">
+                        {att.mimeType && (
+                          <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded font-mono text-[10px]">
+                            {att.mimeType}
+                          </span>
+                        )}
+                        <span className="font-mono text-[11px] text-slate-400 shrink-0">
                           {att.size} · {att.uploadedAt}
                         </span>
                       </div>
@@ -806,8 +1396,21 @@ export const IssueDetailModal = ({
                               {formatShortDate(c.createdAt)}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-700 pl-7">
-                            {c.body}
+                          <p className="text-xs text-slate-700 pl-7 leading-relaxed">
+                            {String(c.body || '')
+                              .split(/(@[a-zA-Z0-9._-]+)/g)
+                              .map((part, pIdx) =>
+                                part.startsWith('@') ? (
+                                  <span
+                                    key={pIdx}
+                                    className="inline-flex items-center px-1.5 py-0.2 mx-0.5 rounded bg-blue-100 text-blue-800 font-mono font-semibold text-[11px]"
+                                  >
+                                    {part}
+                                  </span>
+                                ) : (
+                                  part
+                                )
+                              )}
                           </p>
                           <div className="pl-7 flex items-center gap-1.5 pt-1">
                             {['👍', '🚀', '❤️', '👀'].map((emoji) => (
@@ -1007,15 +1610,51 @@ export const IssueDetailModal = ({
                 </div>
               </div>
 
-              {/* Reporter */}
+              {/* Reporter (Inline Editable) */}
               <div className="grid grid-cols-3 items-center gap-2">
                 <span className="text-slate-500 font-medium">Reporter</span>
                 <div className="col-span-2">
-                  <UserAvatar
-                    user={userMap[issue.reporterId]}
-                    size="xs"
-                    showName
-                  />
+                  <select
+                    value={issue.reporterId || ''}
+                    onChange={(e) =>
+                      onUpdateIssue(issue.id, {
+                        reporterId: e.target.value || users[0]?.id,
+                      })
+                    }
+                    aria-label="Reporter"
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-900 font-medium"
+                  >
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.initials})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Reviewers & Approvers (Matches Jira PDF Details Panel) */}
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-slate-500 font-medium">Reviewers</span>
+                <div className="col-span-2 text-slate-700">
+                  {Array.isArray(issue.reviewers) &&
+                  issue.reviewers.length > 0 ? (
+                    issue.reviewers.join(', ')
+                  ) : (
+                    <span className="text-slate-400">None</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-slate-500 font-medium">Approvers</span>
+                <div className="col-span-2 text-slate-700">
+                  {Array.isArray(issue.approvers) &&
+                  issue.approvers.length > 0 ? (
+                    issue.approvers.join(', ')
+                  ) : (
+                    <span className="text-slate-400">None</span>
+                  )}
                 </div>
               </div>
 
@@ -1058,7 +1697,7 @@ export const IssueDetailModal = ({
                     aria-label="Sprint"
                     className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-900"
                   >
-                    <option value="">Backlog</option>
+                    <option value="">None</option>
                     {sprints.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
@@ -1071,7 +1710,7 @@ export const IssueDetailModal = ({
               {/* Parent Epic */}
               {issue.type !== IssueType.EPIC && (
                 <div className="grid grid-cols-3 items-center gap-2">
-                  <span className="text-slate-500 font-medium">Parent Epic</span>
+                  <span className="text-slate-500 font-medium">Parent</span>
                   <div className="col-span-2">
                     <select
                       value={issue.epicId || ''}
@@ -1096,27 +1735,30 @@ export const IssueDetailModal = ({
 
               {/* Story Points */}
               <div className="grid grid-cols-3 items-center gap-2">
-                <span className="text-slate-500 font-medium">Story Points</span>
-                <div className="col-span-2">
+                <span className="text-slate-500 font-medium">
+                  Story point estimate
+                </span>
+                <div className="col-span-2 flex items-center gap-2">
                   <input
                     type="number"
                     min={0}
                     max={100}
-                    value={issue.storyPoints}
+                    value={issue.storyPoints || ''}
+                    placeholder="None"
                     onChange={(e) =>
                       onUpdateIssue(issue.id, {
                         storyPoints: Math.max(0, Number(e.target.value) || 0),
                       })
                     }
                     aria-label="Story points"
-                    className="w-24 px-2.5 py-1.5 font-mono font-bold bg-slate-50 border border-slate-200 rounded text-slate-900"
+                    className="w-24 px-2.5 py-1.5 font-mono font-bold bg-slate-50 border border-slate-200 rounded text-slate-900 placeholder:text-slate-400 placeholder:font-normal"
                   />
                 </div>
               </div>
 
               {/* Component */}
               <div className="grid grid-cols-3 items-center gap-2">
-                <span className="text-slate-500 font-medium">Component</span>
+                <span className="text-slate-500 font-medium">Components</span>
                 <div className="col-span-2">
                   <select
                     value={issue.componentId || ''}
@@ -1135,6 +1777,29 @@ export const IssueDetailModal = ({
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Development */}
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-slate-500 font-medium">Development</span>
+                <div className="col-span-2 flex flex-wrap items-center gap-2 text-blue-600 font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setActiveActivityTab('DEV_CICD')}
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    <GitBranch className="w-3.5 h-3.5" />
+                    Create branch
+                  </button>
+                  <span className="text-slate-300">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveActivityTab('DEV_CICD')}
+                    className="hover:underline"
+                  >
+                    Create commit
+                  </button>
                 </div>
               </div>
 
@@ -1239,21 +1904,25 @@ export const IssueDetailModal = ({
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
-                  {issue.labels.map((lbl) => (
-                    <span
-                      key={lbl}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[11px] font-mono text-slate-700"
-                    >
-                      {lbl}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveLabel(lbl)}
-                        className="text-slate-400 hover:text-red-600"
+                  {issue.labels.length === 0 ? (
+                    <span className="text-xs text-slate-400">None</span>
+                  ) : (
+                    issue.labels.map((lbl) => (
+                      <span
+                        key={lbl}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[11px] font-mono text-slate-700"
                       >
-                        ×
-                      </button>
-                    </span>
-                  ))}
+                        {lbl}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLabel(lbl)}
+                          className="text-slate-400 hover:text-red-600"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
+                  )}
                 </div>
 
                 {showAddLabel && (
@@ -1302,9 +1971,13 @@ export const IssueDetailModal = ({
             </div>
 
             {/* Timestamps */}
-            <div className="text-[11px] text-slate-400 space-y-0.5 px-1 font-mono">
-              <div>Created: {formatShortDate(issue.createdAt)}</div>
-              <div>Updated: {formatShortDate(issue.updatedAt)}</div>
+            <div className="text-[11px] text-slate-500 space-y-0.5 px-1 font-mono">
+              <div>
+                Created: {issue.createdAtText || formatShortDate(issue.createdAt)}
+              </div>
+              <div>
+                Updated: {issue.updatedAtText || formatShortDate(issue.updatedAt)}
+              </div>
               <div>Issue Type: {TYPE_CONFIG[issue.type].label}</div>
             </div>
           </div>

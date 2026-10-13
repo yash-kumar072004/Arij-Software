@@ -55,8 +55,28 @@ export const UserAccountCenterModal = ({
   const [signupName, setSignupName] = useState('');
   const [signupUsername, setSignupUsername] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('ArijEnterprise#2026');
   const [signupRole, setSignupRole] = useState('Senior Software Engineer');
   const [signupDept, setSignupDept] = useState('Core Engineering');
+
+  // JWT Token state
+  const [jwtSession, setJwtSession] = useState(() => {
+    try {
+      const saved = localStorage.getItem('arij_auth_tokens');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Organization Member RBAC map (Admin, Member, Viewer)
+  const [memberRbacRoles, setMemberRbacRoles] = useState(() => {
+    const initial = {};
+    users.forEach((u, idx) => {
+      initial[u.id] = u.orgRole || (idx === 0 ? 'ADMIN' : 'MEMBER');
+    });
+    return initial;
+  });
 
   // Profile & Regional settings state
   const [displayName, setDisplayName] = useState(currentUser.name);
@@ -135,8 +155,40 @@ export const UserAccountCenterModal = ({
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgDomain, setNewOrgDomain] = useState('');
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: loginEmail.trim(),
+          password: loginPassword || 'password123',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.accessToken) {
+        const tokenBundle = {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresIn: data.expiresIn,
+          userId: data.user?.id,
+        };
+        localStorage.setItem('arij_auth_tokens', JSON.stringify(tokenBundle));
+        setJwtSession(tokenBundle);
+        if (data.user?.id) {
+          onSwitchUser(data.user.id);
+        }
+        setAuthBanner(
+          `JWT Session issued for ${data.user?.name || loginEmail} (Role: ${
+            data.user?.orgRole || 'ADMIN'
+          }).`
+        );
+        return;
+      }
+    } catch {
+      // Fallback to local workspace switch if offline
+    }
     const matched = users.find(
       (u) => u.email.toLowerCase() === loginEmail.trim().toLowerCase()
     );
@@ -152,9 +204,55 @@ export const UserAccountCenterModal = ({
     }
   };
 
-  const handleSignupSubmit = (e) => {
+  const handleLogoutSession = async () => {
+    try {
+      if (jwtSession?.refreshToken) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: jwtSession.refreshToken }),
+        });
+      }
+    } catch {
+      // Ignore network errors on logout
+    }
+    localStorage.removeItem('arij_auth_tokens');
+    setJwtSession(null);
+    setAuthBanner('Signed out and revoked active JWT refresh token.');
+  };
+
+  const handleSignupSubmit = async (e) => {
     e.preventDefault();
     if (!signupName.trim() || !signupEmail.trim()) return;
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: signupName.trim(),
+          username:
+            signupUsername.trim() ||
+            signupName.trim().toLowerCase().replace(/\s+/g, '.'),
+          email: signupEmail.trim(),
+          password: signupPassword || 'ArijEnterprise#2026',
+          role: signupRole.trim(),
+          department: signupDept.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.accessToken) {
+        const tokenBundle = {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresIn: data.expiresIn,
+          userId: data.user?.id,
+        };
+        localStorage.setItem('arij_auth_tokens', JSON.stringify(tokenBundle));
+        setJwtSession(tokenBundle);
+      }
+    } catch {
+      // Continue with local workspace account creation
+    }
     onAddUserAccount({
       name: signupName.trim(),
       username:
@@ -165,16 +263,16 @@ export const UserAccountCenterModal = ({
       department: signupDept.trim(),
     });
     setAuthBanner(
-      `Account created and switched to ${signupName.trim()} with isolated personal workspace!`
+      `Account created and JWT issued for ${signupName.trim()} with isolated personal workspace!`
     );
     setSignupName('');
     setSignupUsername('');
     setSignupEmail('');
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    onUpdateUserProfile(currentUser.id, {
+    const updates = {
       name: displayName.trim() || currentUser.name,
       username,
       email,
@@ -184,7 +282,22 @@ export const UserAccountCenterModal = ({
       language,
       dateFormat,
       timeFormat,
-    });
+    };
+    try {
+      await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(jwtSession?.accessToken
+            ? { Authorization: `Bearer ${jwtSession.accessToken}` }
+            : {}),
+        },
+        body: JSON.stringify(updates),
+      });
+    } catch {
+      // Continue with local profile update
+    }
+    onUpdateUserProfile(currentUser.id, updates);
     setAuthBanner('User profile and regional preferences saved.');
   };
 
@@ -246,13 +359,24 @@ export const UserAccountCenterModal = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-slate-500 hover:text-slate-900 rounded-md"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleLogoutSession}
+              className="px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md flex items-center gap-1.5"
+              title="Log out and revoke JWT token"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Log Out
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-slate-500 hover:text-slate-900 rounded-md"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tabs */}
@@ -1018,6 +1142,98 @@ export const UserAccountCenterModal = ({
                   </button>
                 </div>
               </form>
+
+              {/* Organization Members & RBAC Roles (Admin, Member, Viewer) */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-blue-600" />
+                      Organization Members &amp; Role-Based Access Control (RBAC)
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Assign Admin, Member, or Viewer permissions across the active organization workspace.
+                    </p>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-500">
+                    {users.length} Members
+                  </span>
+                </div>
+
+                <div className="divide-y divide-slate-200 border border-slate-200 rounded-lg">
+                  {users.map((u) => {
+                    const currentRole = memberRbacRoles[u.id] || 'MEMBER';
+                    return (
+                      <div
+                        key={u.id}
+                        className="px-3.5 py-2.5 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <UserAvatar user={u} size="sm" />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-900 truncate">
+                              {u.name}
+                            </div>
+                            <div className="text-[11px] text-slate-500 truncate">
+                              {u.email} · {u.role}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold ${
+                              currentRole === 'ADMIN'
+                                ? 'bg-purple-100 text-purple-800'
+                                : currentRole === 'VIEWER'
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {currentRole}
+                          </span>
+                          <select
+                            value={currentRole}
+                            onChange={async (e) => {
+                              const nextRole = e.target.value;
+                              setMemberRbacRoles((prev) => ({
+                                ...prev,
+                                [u.id]: nextRole,
+                              }));
+                              try {
+                                await fetch(
+                                  `/api/organizations/${activeOrgId}/members`,
+                                  {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                      userId: u.id,
+                                      role: nextRole,
+                                    }),
+                                  }
+                                );
+                              } catch {
+                                // Local state already updated
+                              }
+                              setAuthBanner(
+                                `Updated ${u.name}'s organization role to ${nextRole}.`
+                              );
+                            }}
+                            aria-label={`Role for ${u.name}`}
+                            className="px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-300 rounded text-slate-800"
+                          >
+                            <option value="ADMIN">Admin</option>
+                            <option value="MEMBER">Member</option>
+                            <option value="VIEWER">Viewer</option>
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1035,7 +1251,44 @@ export const NotificationsDrawerModal = ({
   onSelectIssue,
   onClose,
 }) => {
-  const [filter, setFilter] = useState('ALL'); // 'ALL' | 'UNREAD' | 'MENTIONS'
+  const [filter, setFilter] = useState('ALL'); // 'ALL' | 'UNREAD' | 'MENTIONS' | 'EMAIL_OUTBOX'
+  const [emailOutbox, setEmailOutbox] = useState([]);
+  const [sendingDigest, setSendingDigest] = useState(false);
+
+  React.useEffect(() => {
+    fetch('/api/notifications/emails')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.emails) setEmailOutbox(data.emails);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSendEmailDigest = async () => {
+    setSendingDigest(true);
+    try {
+      const res = await fetch('/api/notifications/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: 'arjun.mehta@arij.dev',
+          recipientName: 'Arjun Mehta',
+          issueKey: 'KP-6453',
+          category: 'SPRINT_DIGEST',
+          subject: `[Arij Daily Digest] ${notifications.length} active notifications & sprint updates`,
+          body: `Summary of ${notifications.filter((n) => !n.read).length} unread in-app notifications, @mentions, and watcher alerts across Kawach Portal (KP).`,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.email) {
+        setEmailOutbox((prev) => [data.email, ...prev]);
+      }
+    } catch {
+      // Ignore network errors
+    } finally {
+      setSendingDigest(false);
+    }
+  };
 
   const filtered = notifications.filter((n) => {
     if (filter === 'UNREAD') return !n.read;
@@ -1056,7 +1309,7 @@ export const NotificationsDrawerModal = ({
           <div className="flex items-center gap-2">
             <Bell className="w-4 h-4 text-blue-600" />
             <h2 className="text-sm font-bold text-slate-900">
-              Arij Notifications Center
+              Arij Notifications &amp; Email Center
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -1077,11 +1330,12 @@ export const NotificationsDrawerModal = ({
           </div>
         </div>
 
-        <div className="px-5 py-2.5 border-b border-slate-200 flex items-center gap-1.5 bg-white">
+        <div className="px-5 py-2.5 border-b border-slate-200 flex flex-wrap items-center gap-1.5 bg-white">
           {[
             { id: 'ALL', label: 'All Events' },
             { id: 'UNREAD', label: 'Unread' },
             { id: 'MENTIONS', label: '@Mentions' },
+            { id: 'EMAIL_OUTBOX', label: `Email Outbox (${emailOutbox.length})` },
           ].map((f) => (
             <button
               key={f.id}
@@ -1098,39 +1352,81 @@ export const NotificationsDrawerModal = ({
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-200">
-          {filtered.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400">
-              No notifications in this filter.
-            </div>
-          ) : (
-            filtered.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => {
-                  if (item.issueId) {
-                    onSelectIssue(item.issueId);
-                    onClose();
-                  }
-                }}
-                className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${
-                  !item.read ? 'bg-blue-50/40' : 'bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <span className="font-mono font-semibold text-blue-700">
-                    {item.typeLabel}
-                  </span>
-                  <span className="font-mono">{item.time}</span>
-                </div>
-                <div className="text-xs font-semibold text-slate-900 mt-1">
-                  {item.title}
-                </div>
-                <div className="text-xs text-slate-600 mt-0.5">{item.body}</div>
+        {filter === 'EMAIL_OUTBOX' ? (
+          <div className="flex-1 overflow-y-auto flex flex-col">
+            <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+              <div className="text-[11px] text-slate-600">
+                Transactional SMTP outbox for <span className="font-mono font-semibold">@mentions</span>, watcher alerts, and digests.
               </div>
-            ))
-          )}
-        </div>
+              <button
+                type="button"
+                disabled={sendingDigest}
+                onClick={handleSendEmailDigest}
+                className="px-2.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 shrink-0 flex items-center gap-1"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                {sendingDigest ? 'Sending...' : 'Send Digest'}
+              </button>
+            </div>
+            <div className="divide-y divide-slate-200">
+              {emailOutbox.map((eml) => (
+                <div key={eml.id} className="p-4 space-y-1.5 hover:bg-slate-50">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-mono font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                      {eml.status} · {eml.category}
+                    </span>
+                    <span className="font-mono text-slate-400">
+                      {String(eml.sentAt || '').slice(0, 16).replace('T', ' ')}
+                    </span>
+                  </div>
+                  <div className="text-xs font-bold text-slate-900">
+                    {eml.subject}
+                  </div>
+                  <div className="text-[11px] font-mono text-slate-500">
+                    To: {eml.to} ({eml.recipientName})
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {eml.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-200">
+            {filtered.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                No notifications in this filter.
+              </div>
+            ) : (
+              filtered.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    if (item.issueId) {
+                      onSelectIssue(item.issueId);
+                      onClose();
+                    }
+                  }}
+                  className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${
+                    !item.read ? 'bg-blue-50/40' : 'bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="font-mono font-semibold text-blue-700">
+                      {item.typeLabel}
+                    </span>
+                    <span className="font-mono">{item.time}</span>
+                  </div>
+                  <div className="text-xs font-semibold text-slate-900 mt-1">
+                    {item.title}
+                  </div>
+                  <div className="text-xs text-slate-600 mt-0.5">{item.body}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
