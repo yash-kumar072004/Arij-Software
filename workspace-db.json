@@ -1,6 +1,6 @@
 {
-  "revision": 28,
-  "updatedAt": "2026-10-13T05:03:06.815Z",
+  "revision": 54,
+  "updatedAt": "2026-10-15T06:35:09.238Z",
   "workspace": {
     "currentUserId": "usr-1",
     "activeProjectId": "prj-1",
@@ -128,7 +128,7 @@
         "defaultAssigneeId": "usr-6",
         "ownerUserId": null,
         "isPersonal": false,
-        "issueCounter": 6459,
+        "issueCounter": 6465,
         "wipLimits": {
           "TODO": 0,
           "IN_PROGRESS": 4,
@@ -457,6 +457,54 @@
         "completedAt": "2026-10-13T05:03:06.815Z",
         "committedPoints": 0,
         "completedPoints": 0
+      },
+      {
+        "id": "spr-1791877070058",
+        "projectId": "prj-1",
+        "name": "Sprint 45 — E2E Verification",
+        "goal": "Updated active sprint goal",
+        "status": "COMPLETED",
+        "startDate": "2026-10-13",
+        "endDate": "2026-10-30",
+        "completedAt": "2026-10-13T07:37:50.071Z",
+        "committedPoints": 0,
+        "completedPoints": 0
+      },
+      {
+        "id": "spr-1792046035300",
+        "projectId": "prj-1",
+        "name": "Sprint 45 — E2E Verification",
+        "goal": "Updated active sprint goal",
+        "status": "COMPLETED",
+        "startDate": "2026-10-15",
+        "endDate": "2026-10-30",
+        "completedAt": "2026-10-15T06:33:55.317Z",
+        "committedPoints": 0,
+        "completedPoints": 0
+      },
+      {
+        "id": "spr-1792046050751",
+        "projectId": "prj-1",
+        "name": "Sprint 45 — E2E Verification",
+        "goal": "Updated active sprint goal",
+        "status": "COMPLETED",
+        "startDate": "2026-10-15",
+        "endDate": "2026-10-30",
+        "completedAt": "2026-10-15T06:34:10.774Z",
+        "committedPoints": 0,
+        "completedPoints": 0
+      },
+      {
+        "id": "spr-1792046109220",
+        "projectId": "prj-1",
+        "name": "Sprint 45 — E2E Verification",
+        "goal": "Updated active sprint goal",
+        "status": "COMPLETED",
+        "startDate": "2026-10-15",
+        "endDate": "2026-10-30",
+        "completedAt": "2026-10-15T06:35:09.238Z",
+        "committedPoints": 0,
+        "completedPoints": 0
       }
     ],
     "releases": [
@@ -558,6 +606,484 @@
       }
     ],
     "issues": [
+      {
+        "id": "iss-1792046109063-njpl",
+        "projectId": "prj-1",
+        "key": "KP-6465",
+        "title": "Kanban Drag Transition Test Issue",
+        "description": "",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-15",
+        "dueDate": "",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-1792046109152-4f91",
+            "authorId": "usr-1",
+            "body": "Hey @Arjun please review the updated SQL migration schema.",
+            "mentions": [
+              "Arjun"
+            ],
+            "createdAt": "2026-10-15T06:35:09.152Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [
+          {
+            "id": "hst-1792046109077-g5sr",
+            "actorId": "usr-1",
+            "field": "type",
+            "oldValue": "TASK",
+            "newValue": "STORY",
+            "timestamp": "2026-10-15T06:35:09.077Z"
+          },
+          {
+            "id": "hst-1792046109077-igxk",
+            "actorId": "usr-1",
+            "field": "storyPoints",
+            "oldValue": "5",
+            "newValue": "0",
+            "timestamp": "2026-10-15T06:35:09.077Z"
+          },
+          {
+            "id": "hst-1792046109077-m3zd",
+            "actorId": "usr-1",
+            "field": "priority",
+            "oldValue": "HIGH",
+            "newValue": "MEDIUM",
+            "timestamp": "2026-10-15T06:35:09.077Z"
+          },
+          {
+            "id": "hst-1792046109077-hjuz",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "TODO",
+            "newValue": "IN_PROGRESS",
+            "timestamp": "2026-10-15T06:35:09.077Z"
+          },
+          {
+            "id": "hst-1792046109063",
+            "actorId": "usr-1",
+            "field": "created",
+            "oldValue": "None",
+            "newValue": "TODO",
+            "timestamp": "2026-10-15T06:35:09.063Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-15T06:35:09.063Z",
+        "updatedAt": "2026-10-15T06:35:09.153Z",
+        "order": 55,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1792046108607-8xzy",
+        "isUserCreated": true,
+        "projectId": "prj-1",
+        "projectName": "Kawach Product",
+        "projectKey": "KP",
+        "parentKey": "KP-5831",
+        "parentTitle": "Automation Test Cases",
+        "parentStatus": "IN_PROGRESS",
+        "key": "KP-6464",
+        "title": "E2E OAuth Token Rotation Verification 1792046108463",
+        "description": "Verify JWT access and refresh token rotation under concurrent load.",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": "iss-epic-kp-5831",
+        "sprintId": null,
+        "explicitNoSprint": false,
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 12,
+        "labels": [
+          "security",
+          "q4"
+        ],
+        "reviewers": [],
+        "approvers": [],
+        "createdAtText": "March 18, 2026 at 5:26 PM",
+        "updatedAtText": "March 18, 2026 at 5:26 PM",
+        "sourceUrl": "https://kawach.atlassian.net/browse/KP-6464",
+        "componentId": "cmp-frontend-spa",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-15",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-15T06:35:08.607Z",
+        "updatedAt": "2026-10-15T06:35:08.607Z",
+        "order": 54
+      },
+      {
+        "id": "iss-1792046050625-1ir5",
+        "projectId": "prj-1",
+        "key": "KP-6463",
+        "title": "Kanban Drag Transition Test Issue",
+        "description": "",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-15",
+        "dueDate": "",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-1792046050702-j18s",
+            "authorId": "usr-1",
+            "body": "Hey @Arjun please review the updated SQL migration schema.",
+            "mentions": [
+              "Arjun"
+            ],
+            "createdAt": "2026-10-15T06:34:10.702Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [
+          {
+            "id": "hst-1792046050641-eywr",
+            "actorId": "usr-1",
+            "field": "type",
+            "oldValue": "TASK",
+            "newValue": "STORY",
+            "timestamp": "2026-10-15T06:34:10.641Z"
+          },
+          {
+            "id": "hst-1792046050641-sgod",
+            "actorId": "usr-1",
+            "field": "storyPoints",
+            "oldValue": "5",
+            "newValue": "0",
+            "timestamp": "2026-10-15T06:34:10.641Z"
+          },
+          {
+            "id": "hst-1792046050641-8zf0",
+            "actorId": "usr-1",
+            "field": "priority",
+            "oldValue": "HIGH",
+            "newValue": "MEDIUM",
+            "timestamp": "2026-10-15T06:34:10.641Z"
+          },
+          {
+            "id": "hst-1792046050641-snau",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "TODO",
+            "newValue": "IN_PROGRESS",
+            "timestamp": "2026-10-15T06:34:10.641Z"
+          },
+          {
+            "id": "hst-1792046050625",
+            "actorId": "usr-1",
+            "field": "created",
+            "oldValue": "None",
+            "newValue": "TODO",
+            "timestamp": "2026-10-15T06:34:10.625Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-15T06:34:10.625Z",
+        "updatedAt": "2026-10-15T06:34:10.702Z",
+        "order": 53,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1792046035133-w92c",
+        "projectId": "prj-1",
+        "key": "KP-6462",
+        "title": "Kanban Drag Transition Test Issue",
+        "description": "",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-15",
+        "dueDate": "",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-1792046035233-z4xd",
+            "authorId": "usr-1",
+            "body": "Hey @Arjun please review the updated SQL migration schema.",
+            "mentions": [
+              "Arjun"
+            ],
+            "createdAt": "2026-10-15T06:33:55.233Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [
+          {
+            "id": "hst-1792046035155-s3fa",
+            "actorId": "usr-1",
+            "field": "type",
+            "oldValue": "TASK",
+            "newValue": "STORY",
+            "timestamp": "2026-10-15T06:33:55.155Z"
+          },
+          {
+            "id": "hst-1792046035155-ufr5",
+            "actorId": "usr-1",
+            "field": "storyPoints",
+            "oldValue": "5",
+            "newValue": "0",
+            "timestamp": "2026-10-15T06:33:55.155Z"
+          },
+          {
+            "id": "hst-1792046035155-m0is",
+            "actorId": "usr-1",
+            "field": "priority",
+            "oldValue": "HIGH",
+            "newValue": "MEDIUM",
+            "timestamp": "2026-10-15T06:33:55.155Z"
+          },
+          {
+            "id": "hst-1792046035155-2qt8",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "TODO",
+            "newValue": "IN_PROGRESS",
+            "timestamp": "2026-10-15T06:33:55.155Z"
+          },
+          {
+            "id": "hst-1792046035133",
+            "actorId": "usr-1",
+            "field": "created",
+            "oldValue": "None",
+            "newValue": "TODO",
+            "timestamp": "2026-10-15T06:33:55.133Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-15T06:33:55.133Z",
+        "updatedAt": "2026-10-15T06:33:55.234Z",
+        "order": 52,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1791877069932-o2ls",
+        "projectId": "prj-1",
+        "key": "KP-6461",
+        "title": "Kanban Drag Transition Test Issue",
+        "description": "",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "IN_PROGRESS",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": null,
+        "sprintId": null,
+        "storyPoints": 0,
+        "originalEstimateHours": 0,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 0,
+        "labels": [],
+        "componentId": null,
+        "fixVersionId": null,
+        "startDate": "2026-10-13",
+        "dueDate": "",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [
+          {
+            "id": "cmt-1791877070009-9f2m",
+            "authorId": "usr-1",
+            "body": "Hey @Arjun please review the updated SQL migration schema.",
+            "mentions": [
+              "Arjun"
+            ],
+            "createdAt": "2026-10-13T07:37:50.009Z"
+          }
+        ],
+        "workLogs": [],
+        "history": [
+          {
+            "id": "hst-1791877069946-0xlv",
+            "actorId": "usr-1",
+            "field": "type",
+            "oldValue": "TASK",
+            "newValue": "STORY",
+            "timestamp": "2026-10-13T07:37:49.946Z"
+          },
+          {
+            "id": "hst-1791877069946-mlhm",
+            "actorId": "usr-1",
+            "field": "storyPoints",
+            "oldValue": "5",
+            "newValue": "0",
+            "timestamp": "2026-10-13T07:37:49.946Z"
+          },
+          {
+            "id": "hst-1791877069946-lkwk",
+            "actorId": "usr-1",
+            "field": "priority",
+            "oldValue": "HIGH",
+            "newValue": "MEDIUM",
+            "timestamp": "2026-10-13T07:37:49.946Z"
+          },
+          {
+            "id": "hst-1791877069946-vrlx",
+            "actorId": "usr-1",
+            "field": "status",
+            "oldValue": "TODO",
+            "newValue": "IN_PROGRESS",
+            "timestamp": "2026-10-13T07:37:49.946Z"
+          },
+          {
+            "id": "hst-1791877069932",
+            "actorId": "usr-1",
+            "field": "created",
+            "oldValue": "None",
+            "newValue": "TODO",
+            "timestamp": "2026-10-13T07:37:49.932Z"
+          }
+        ],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-13T07:37:49.932Z",
+        "updatedAt": "2026-10-13T07:37:50.009Z",
+        "order": 51,
+        "isUserCreated": true
+      },
+      {
+        "id": "iss-1791877069498-kk6h",
+        "isUserCreated": true,
+        "projectId": "prj-1",
+        "projectName": "Kawach Product",
+        "projectKey": "KP",
+        "parentKey": "KP-5831",
+        "parentTitle": "Automation Test Cases",
+        "parentStatus": "IN_PROGRESS",
+        "key": "KP-6460",
+        "title": "E2E OAuth Token Rotation Verification 1791877069361",
+        "description": "Verify JWT access and refresh token rotation under concurrent load.",
+        "userStory": "",
+        "scopeDescription": "",
+        "acceptanceCriteria": [],
+        "testCases": [],
+        "definitionOfDone": [],
+        "type": "STORY",
+        "status": "TODO",
+        "priority": "MEDIUM",
+        "assigneeId": "usr-1",
+        "reporterId": "usr-1",
+        "epicId": "iss-epic-kp-5831",
+        "sprintId": null,
+        "explicitNoSprint": false,
+        "storyPoints": 5,
+        "originalEstimateHours": 12,
+        "timeSpentHours": 0,
+        "remainingEstimateHours": 12,
+        "labels": [
+          "security",
+          "q4"
+        ],
+        "reviewers": [],
+        "approvers": [],
+        "createdAtText": "March 18, 2026 at 5:26 PM",
+        "updatedAtText": "March 18, 2026 at 5:26 PM",
+        "sourceUrl": "https://kawach.atlassian.net/browse/KP-6460",
+        "componentId": "cmp-frontend-spa",
+        "fixVersionId": "rel-2",
+        "startDate": "2026-10-13",
+        "dueDate": "2026-10-16",
+        "subtasks": [],
+        "attachments": [],
+        "links": [],
+        "comments": [],
+        "workLogs": [],
+        "history": [],
+        "watcherIds": [
+          "usr-1"
+        ],
+        "createdAt": "2026-10-13T07:37:49.498Z",
+        "updatedAt": "2026-10-13T07:37:49.498Z",
+        "order": 50
+      },
       {
         "id": "iss-1791867786519-ameh",
         "projectId": "prj-1",

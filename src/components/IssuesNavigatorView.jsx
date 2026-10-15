@@ -1,12 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
+  ArrowRightLeft,
   Bookmark,
+  CheckSquare,
   Code2,
   Download,
+  Edit3,
   LayoutList,
   PanelRight,
   Search,
   SlidersHorizontal,
+  Square,
+  Trash2,
 } from 'lucide-react';
 import {
   IssuePriority,
@@ -64,6 +70,10 @@ export const IssuesNavigatorView = ({
 
   // Split view selected issue
   const [splitIssueId, setSplitIssueId] = useState(issues[0]?.id || null);
+
+  // Bulk Operations State
+  const [selectedIssueIds, setSelectedIssueIds] = useState(new Set());
+  const [isBulkOperating, setIsBulkOperating] = useState(false);
 
   // Save filter inline form
   const [savingFilter, setSavingFilter] = useState(false);
@@ -361,6 +371,105 @@ export const IssuesNavigatorView = ({
     }).catch(() => {});
     setNewFilterName('');
     setSavingFilter(false);
+  };
+
+  const toggleSelectAllCurrentPage = () => {
+    setSelectedIssueIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = paginatedIssues.every((i) => next.has(i.id));
+      if (allSelected) {
+        paginatedIssues.forEach((i) => next.delete(i.id));
+      } else {
+        paginatedIssues.forEach((i) => next.add(i.id));
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectIssue = (id) => {
+    setSelectedIssueIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkStatusChange = async (newStatus) => {
+    if (selectedIssueIds.size === 0) return;
+    setIsBulkOperating(true);
+    const ids = Array.from(selectedIssueIds);
+    try {
+      await fetch('/api/issues/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueIds: ids, updates: { status: newStatus } }),
+      });
+      ids.forEach((id) => onUpdateIssue(id, { status: newStatus }));
+      setSelectedIssueIds(new Set());
+    } catch (err) {
+      console.error('Bulk status update failed:', err);
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkPriorityChange = async (newPriority) => {
+    if (selectedIssueIds.size === 0) return;
+    setIsBulkOperating(true);
+    const ids = Array.from(selectedIssueIds);
+    try {
+      await fetch('/api/issues/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueIds: ids, updates: { priority: newPriority } }),
+      });
+      ids.forEach((id) => onUpdateIssue(id, { priority: newPriority }));
+      setSelectedIssueIds(new Set());
+    } catch (err) {
+      console.error('Bulk priority update failed:', err);
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkAssigneeChange = async (newAssigneeId) => {
+    if (selectedIssueIds.size === 0) return;
+    setIsBulkOperating(true);
+    const ids = Array.from(selectedIssueIds);
+    try {
+      await fetch('/api/issues/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueIds: ids, updates: { assigneeId: newAssigneeId || null } }),
+      });
+      ids.forEach((id) => onUpdateIssue(id, { assigneeId: newAssigneeId || null }));
+      setSelectedIssueIds(new Set());
+    } catch (err) {
+      console.error('Bulk assignee update failed:', err);
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkDeleteIssues = async () => {
+    if (selectedIssueIds.size === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIssueIds.size} selected issues?`)) return;
+    setIsBulkOperating(true);
+    const ids = Array.from(selectedIssueIds);
+    try {
+      await fetch('/api/issues/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueIds: ids }),
+      });
+      ids.forEach((id) => onUpdateIssue(id, { isDeleted: true }));
+      setSelectedIssueIds(new Set());
+    } catch (err) {
+      console.error('Bulk delete failed:', err);
+    } finally {
+      setIsBulkOperating(false);
+    }
   };
 
   const activeSplitIssue = useMemo(() => {
@@ -676,9 +785,109 @@ export const IssuesNavigatorView = ({
       <div className="flex-1 overflow-auto p-6 bg-slate-50">
         {viewLayout === 'TABLE' ? (
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            {/* Bulk Action Bar (Jira Bulk Edit / Move / Transition / Delete) */}
+            {selectedIssueIds.size > 0 && (
+              <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 font-semibold text-blue-900">
+                  <CheckSquare className="w-4 h-4 text-blue-600" />
+                  <span>{selectedIssueIds.size} issues selected</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Bulk Status Change */}
+                  <div className="flex items-center gap-1 bg-white border border-blue-200 rounded px-2 py-1">
+                    <span className="text-slate-500 font-medium text-[11px]">Set Status:</span>
+                    <select
+                      disabled={isBulkOperating}
+                      onChange={(e) => {
+                        if (e.target.value) handleBulkStatusChange(e.target.value);
+                      }}
+                      defaultValue=""
+                      className="text-xs font-semibold bg-transparent border-none focus:outline-none text-slate-800"
+                    >
+                      <option value="" disabled>Choose...</option>
+                      {STATUS_ORDER.map((st) => (
+                        <option key={st} value={st}>{STATUS_CONFIG[st].label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Bulk Priority Change */}
+                  <div className="flex items-center gap-1 bg-white border border-blue-200 rounded px-2 py-1">
+                    <span className="text-slate-500 font-medium text-[11px]">Set Priority:</span>
+                    <select
+                      disabled={isBulkOperating}
+                      onChange={(e) => {
+                        if (e.target.value) handleBulkPriorityChange(e.target.value);
+                      }}
+                      defaultValue=""
+                      className="text-xs font-semibold bg-transparent border-none focus:outline-none text-slate-800"
+                    >
+                      <option value="" disabled>Choose...</option>
+                      <option value={IssuePriority.HIGHEST}>Highest</option>
+                      <option value={IssuePriority.HIGH}>High</option>
+                      <option value={IssuePriority.MEDIUM}>Medium</option>
+                      <option value={IssuePriority.LOW}>Low</option>
+                      <option value={IssuePriority.LOWEST}>Lowest</option>
+                    </select>
+                  </div>
+
+                  {/* Bulk Assignee Change */}
+                  <div className="flex items-center gap-1 bg-white border border-blue-200 rounded px-2 py-1">
+                    <span className="text-slate-500 font-medium text-[11px]">Assign To:</span>
+                    <select
+                      disabled={isBulkOperating}
+                      onChange={(e) => {
+                        if (e.target.value !== undefined) handleBulkAssigneeChange(e.target.value);
+                      }}
+                      defaultValue=""
+                      className="text-xs font-semibold bg-transparent border-none focus:outline-none text-slate-800"
+                    >
+                      <option value="" disabled>Choose...</option>
+                      <option value="">Unassign</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Bulk Delete */}
+                  <button
+                    type="button"
+                    disabled={isBulkOperating}
+                    onClick={handleBulkDeleteIssues}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIssueIds(new Set())}
+                    className="text-xs text-slate-500 hover:text-slate-800 px-1"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+            )}
+
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 select-none">
+                  <th className="py-2.5 px-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all issues on page"
+                      checked={
+                        paginatedIssues.length > 0 &&
+                        paginatedIssues.every((i) => selectedIssueIds.has(i.id))
+                      }
+                      onChange={toggleSelectAllCurrentPage}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="py-2.5 px-4 w-24">Type</th>
                   <th
                     onClick={() =>
@@ -725,7 +934,7 @@ export const IssuesNavigatorView = ({
               <tbody className="divide-y divide-slate-200 text-xs">
                 {paginatedIssues.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={9} className="py-12 text-center text-slate-400">
                       No issues match the current filter criteria.
                     </td>
                   </tr>
@@ -733,12 +942,27 @@ export const IssuesNavigatorView = ({
                   paginatedIssues.map((iss) => {
                     const assignee = iss.assigneeId ? userMap[iss.assigneeId] : null;
                     const overdue = isOverdue(iss.dueDate, iss.status);
+                    const isSelected = selectedIssueIds.has(iss.id);
                     return (
                       <tr
                         key={iss.id}
                         onClick={() => onSelectIssue(iss.id)}
-                        className="hover:bg-slate-50 cursor-pointer transition-colors"
+                        className={`hover:bg-slate-50 cursor-pointer transition-colors ${
+                          isSelected ? 'bg-blue-50/50' : ''
+                        }`}
                       >
+                        <td
+                          className="py-2.5 px-3 text-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectIssue(iss.id)}
+                            aria-label={`Select issue ${iss.key}`}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </td>
                         <td className="py-2.5 px-4">
                           <div className="flex items-center gap-1.5">
                             <IssueTypeIcon type={iss.type} />
@@ -749,7 +973,18 @@ export const IssuesNavigatorView = ({
                           {iss.key}
                         </td>
                         <td className="py-2.5 px-4 font-medium text-slate-900">
-                          {iss.title}
+                          <div className="flex items-center gap-1.5">
+                            {iss.isFlagged && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0"
+                                title="Flagged / Impediment"
+                              >
+                                <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
+                                FLAGGED
+                              </span>
+                            )}
+                            <span className="truncate">{iss.title}</span>
+                          </div>
                         </td>
                         <td className="py-2.5 px-4">
                           <div className="flex items-center gap-2">

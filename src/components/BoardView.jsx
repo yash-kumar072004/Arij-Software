@@ -320,11 +320,11 @@ export const BoardView = ({
           setDragOverColumnKey(null);
         }}
         onClick={() => onSelectIssue(issue.id)}
-        className={`group bg-white border border-slate-200 rounded-md p-3.5 shadow-2xs hover:border-blue-500 hover:shadow-md transition-all cursor-pointer select-none flex flex-col gap-2.5 ${
-          draggedIssueId === issue.id ? 'opacity-40 scale-[0.98]' : ''
-        }`}
+        className={`group bg-white border rounded-md p-3.5 shadow-2xs hover:border-blue-500 hover:shadow-md transition-all cursor-pointer select-none flex flex-col gap-2.5 ${
+          issue.isFlagged ? 'border-amber-400 bg-amber-50/30' : 'border-slate-200'
+        } ${draggedIssueId === issue.id ? 'opacity-40 scale-[0.98]' : ''}`}
       >
-        {/* Row 1: Arij Issue Type Badge + Monospace Issue Key + Due Date */}
+        {/* Row 1: Arij Issue Type Badge + Monospace Issue Key + Flagged + Due Date */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span
@@ -336,6 +336,15 @@ export const BoardView = ({
             <span className="font-mono tabular-nums text-xs font-semibold text-slate-500 group-hover:text-blue-600 transition-colors">
               {issue.key}
             </span>
+            {issue.isFlagged && (
+              <span
+                className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300"
+                title="Flagged / Impediment"
+              >
+                <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
+                FLAGGED
+              </span>
+            )}
           </div>
           {issue.dueDate && (
             <span

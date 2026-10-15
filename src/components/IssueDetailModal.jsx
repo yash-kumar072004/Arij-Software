@@ -1803,6 +1803,53 @@ export const IssueDetailModal = ({
                 </div>
               </div>
 
+              {/* Resolution Field (Unresolved vs Done / Fixed / Won't Do / Duplicate) */}
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-slate-500 font-medium">Resolution</span>
+                <div className="col-span-2">
+                  <select
+                    value={issue.resolution || (issue.status === IssueStatus.DONE ? 'Done' : 'Unresolved')}
+                    onChange={(e) =>
+                      onUpdateIssue(issue.id, {
+                        resolution: e.target.value,
+                      })
+                    }
+                    aria-label="Resolution"
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-900 font-medium"
+                  >
+                    <option value="Unresolved">Unresolved</option>
+                    <option value="Done">Done</option>
+                    <option value="Fixed">Fixed</option>
+                    <option value="Cannot Reproduce">Cannot Reproduce</option>
+                    <option value="Won't Fix">Won&rsquo;t Fix</option>
+                    <option value="Duplicate">Duplicate</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Flagged / Impeded Status (Jira Impediment Flag) */}
+              <div className="grid grid-cols-3 items-center gap-2">
+                <span className="text-slate-500 font-medium">Flagged</span>
+                <div className="col-span-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdateIssue(issue.id, {
+                        isFlagged: !issue.isFlagged,
+                      })
+                    }
+                    className={`px-2.5 py-1 text-xs font-semibold rounded flex items-center gap-1.5 border transition-colors ${
+                      issue.isFlagged
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <AlertTriangle className={`w-3.5 h-3.5 ${issue.isFlagged ? 'text-amber-600' : 'text-slate-400'}`} />
+                    {issue.isFlagged ? 'Impediment / Flagged' : 'Not Flagged'}
+                  </button>
+                </div>
+              </div>
+
               {/* Fix Version */}
               <div className="grid grid-cols-3 items-center gap-2">
                 <span className="text-slate-500 font-medium">Fix Version</span>
@@ -1888,6 +1935,62 @@ export const IssueDetailModal = ({
                     <option>Internal Engineering</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Dynamic Jira Custom Fields */}
+              {Object.entries(issue.customFields || {}).map(([key, val]) => (
+                <div key={key} className="grid grid-cols-3 items-center gap-2">
+                  <span className="text-slate-500 font-medium truncate" title={key}>
+                    {key}
+                  </span>
+                  <div className="col-span-2 flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={String(val || '')}
+                      onChange={(e) =>
+                        onUpdateIssue(issue.id, {
+                          customFields: {
+                            ...(issue.customFields || {}),
+                            [key]: e.target.value,
+                          },
+                        })
+                      }
+                      className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs"
+                    />
+                    <button
+                      type="button"
+                      title="Remove custom field"
+                      onClick={() => {
+                        const nextCf = { ...(issue.customFields || {}) };
+                        delete nextCf[key];
+                        onUpdateIssue(issue.id, { customFields: nextCf });
+                      }}
+                      className="text-slate-400 hover:text-red-600 text-xs px-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <div className="pt-1 flex items-center justify-between text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fieldName = window.prompt('Enter new custom field name (e.g. Risk Level, Root Cause, Cost Center):');
+                    if (fieldName && fieldName.trim()) {
+                      onUpdateIssue(issue.id, {
+                        customFields: {
+                          ...(issue.customFields || {}),
+                          [fieldName.trim()]: '',
+                        },
+                      });
+                    }
+                  }}
+                  className="font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                >
+                  + Add Custom Field
+                </button>
               </div>
 
               {/* Labels */}

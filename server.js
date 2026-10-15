@@ -1450,6 +1450,79 @@ app.delete('/api/issues/:id', requireRole(['ADMIN', 'MEMBER']), async (req, res)
   res.json({ ok: true, deletedId: existing.id });
 });
 
+// --- Phase 2+ Bulk Operations: Bulk Update & Bulk Delete ---
+app.post('/api/issues/bulk-update', requireRole(['ADMIN', 'MEMBER']), async (req, res) => {
+  const { issueIds, updates } = req.body || {};
+  if (!Array.isArray(issueIds) || issueIds.length === 0) {
+    res.status(400).json({ error: 'Array of issueIds is required' });
+    return;
+  }
+
+  const result = await stateMutex.run(async () => {
+    authoritativeWorkspace = {
+      ...authoritativeWorkspace,
+      issues: (authoritativeWorkspace.issues || []).map((iss) => {
+        if (!issueIds.includes(iss.id)) return iss;
+        return {
+          ...iss,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+          history: [
+            ...(iss.history || []),
+            {
+              id: `hst-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              actorId: req.currentUser?.id || 'usr-1',
+              field: 'bulk_update',
+              oldValue: 'Multiple',
+              newValue: JSON.stringify(updates),
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        };
+      }),
+    };
+    serverRevision += 1;
+    await persistDatabaseToDisk();
+    return { workspace: authoritativeWorkspace, revision: serverRevision };
+  });
+
+  broadcastEvent('workspace:sync', {
+    workspace: result.workspace,
+    revision: result.revision,
+    collaborators: getActiveCollaborators(),
+  });
+
+  res.json({ ok: true, count: issueIds.length, workspace: result.workspace });
+});
+
+app.post('/api/issues/bulk-delete', requireRole(['ADMIN', 'MEMBER']), async (req, res) => {
+  const { issueIds } = req.body || {};
+  if (!Array.isArray(issueIds) || issueIds.length === 0) {
+    res.status(400).json({ error: 'Array of issueIds is required' });
+    return;
+  }
+
+  const result = await stateMutex.run(async () => {
+    authoritativeWorkspace = {
+      ...authoritativeWorkspace,
+      issues: (authoritativeWorkspace.issues || []).filter(
+        (iss) => !issueIds.includes(iss.id)
+      ),
+    };
+    serverRevision += 1;
+    await persistDatabaseToDisk();
+    return { workspace: authoritativeWorkspace, revision: serverRevision };
+  });
+
+  broadcastEvent('workspace:sync', {
+    workspace: result.workspace,
+    revision: result.revision,
+    collaborators: getActiveCollaborators(),
+  });
+
+  res.json({ ok: true, deletedCount: issueIds.length, workspace: result.workspace });
+});
+
 // --- Phase 3: Collaboration (Comments with @Mentions, Activity Log, Attachments, Watchers, Links) ---
 app.post(
   '/api/issues/:id/comments',
